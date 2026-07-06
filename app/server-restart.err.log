@@ -1,0 +1,10 @@
+Error: Upstream request failed
+    at callOpenAIImage (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/server/index.js:2594:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async callOpenAIImageWithRetry (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/server/index.js:2771:14)
+    at async file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/server/index.js:3924:20
+Error: Upstream request failed
+    at callOpenAIImage (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/server/index.js:2594:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async callOpenAIImageWithRetry (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/server/index.js:2771:14)
+    at async file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/server/index.js:3924:20
