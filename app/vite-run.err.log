@@ -1,0 +1,269 @@
+[2m09:57:53[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:1065:92 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1065 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249ma[0m[38;5;249ms[0m[38;5;249my[0m[38;5;249mn[0m[38;5;249mc[0m[38;5;249m [0m[38;5;249mf[0m[38;5;249mu[0m[38;5;249mn[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mi[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249m [0m[38;5;249ms[0m[38;5;249ma[0m[38;5;249mv[0m[38;5;249me[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249mO[0m[38;5;249mr[0m[38;5;249md[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249m([0m[38;5;249mn[0m[38;5;249me[0m[38;5;249mx[0m[38;5;249mt[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249ms[0m[38;5;249m:[0m[38;5;249m [0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m[[0m[38;5;249m][0m[38;5;249m,[0m[38;5;249m [0m[38;5;249mp[0m[38;5;249mr[0m[38;5;249me[0m[38;5;249mv[0m[38;5;249mi[0m[38;5;249mo[0m[38;5;249mu[0m[38;5;249ms[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249ms[0m[38;5;249m:[0m[38;5;249m [0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m[[0m[38;5;249m][0m[38;5;249m,[0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249mu[0m[38;5;249ms[0m[38;5;249mT[0m[38;5;249me[0m[38;5;249mx[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m'鎶€鑳芥帓搴忓凡淇濆瓨銆?) {
+ [38;5;240m     │[0m                                                                                            ────────────────┬────────────  
+ [38;5;240m     │[0m                                                                                                            ╰────────────── 
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m09:57:53[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m09:58:06[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:1066:92 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1066 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249ma[0m[38;5;249ms[0m[38;5;249my[0m[38;5;249mn[0m[38;5;249mc[0m[38;5;249m [0m[38;5;249mf[0m[38;5;249mu[0m[38;5;249mn[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mi[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249m [0m[38;5;249ms[0m[38;5;249ma[0m[38;5;249mv[0m[38;5;249me[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249mO[0m[38;5;249mr[0m[38;5;249md[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249m([0m[38;5;249mn[0m[38;5;249me[0m[38;5;249mx[0m[38;5;249mt[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249ms[0m[38;5;249m:[0m[38;5;249m [0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m[[0m[38;5;249m][0m[38;5;249m,[0m[38;5;249m [0m[38;5;249mp[0m[38;5;249mr[0m[38;5;249me[0m[38;5;249mv[0m[38;5;249mi[0m[38;5;249mo[0m[38;5;249mu[0m[38;5;249ms[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249ms[0m[38;5;249m:[0m[38;5;249m [0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m[[0m[38;5;249m][0m[38;5;249m,[0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249mu[0m[38;5;249ms[0m[38;5;249mT[0m[38;5;249me[0m[38;5;249mx[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m'鎶€鑳芥帓搴忓凡淇濆瓨銆?) {
+ [38;5;240m     │[0m                                                                                            ────────────────┬────────────  
+ [38;5;240m     │[0m                                                                                                            ╰────────────── 
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m09:58:06[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m09:58:17[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:1066:92 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1066 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249ma[0m[38;5;249ms[0m[38;5;249my[0m[38;5;249mn[0m[38;5;249mc[0m[38;5;249m [0m[38;5;249mf[0m[38;5;249mu[0m[38;5;249mn[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mi[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249m [0m[38;5;249ms[0m[38;5;249ma[0m[38;5;249mv[0m[38;5;249me[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249mO[0m[38;5;249mr[0m[38;5;249md[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249m([0m[38;5;249mn[0m[38;5;249me[0m[38;5;249mx[0m[38;5;249mt[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249ms[0m[38;5;249m:[0m[38;5;249m [0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m[[0m[38;5;249m][0m[38;5;249m,[0m[38;5;249m [0m[38;5;249mp[0m[38;5;249mr[0m[38;5;249me[0m[38;5;249mv[0m[38;5;249mi[0m[38;5;249mo[0m[38;5;249mu[0m[38;5;249ms[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249ms[0m[38;5;249m:[0m[38;5;249m [0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m[[0m[38;5;249m][0m[38;5;249m,[0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249mu[0m[38;5;249ms[0m[38;5;249mT[0m[38;5;249me[0m[38;5;249mx[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m'鎶€鑳芥帓搴忓凡淇濆瓨銆?) {
+ [38;5;240m     │[0m                                                                                            ────────────────┬────────────  
+ [38;5;240m     │[0m                                                                                                            ╰────────────── 
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m09:58:17[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m09:59:06[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:1066:92 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1066 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249ma[0m[38;5;249ms[0m[38;5;249my[0m[38;5;249mn[0m[38;5;249mc[0m[38;5;249m [0m[38;5;249mf[0m[38;5;249mu[0m[38;5;249mn[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mi[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249m [0m[38;5;249ms[0m[38;5;249ma[0m[38;5;249mv[0m[38;5;249me[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249mO[0m[38;5;249mr[0m[38;5;249md[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249m([0m[38;5;249mn[0m[38;5;249me[0m[38;5;249mx[0m[38;5;249mt[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249ms[0m[38;5;249m:[0m[38;5;249m [0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m[[0m[38;5;249m][0m[38;5;249m,[0m[38;5;249m [0m[38;5;249mp[0m[38;5;249mr[0m[38;5;249me[0m[38;5;249mv[0m[38;5;249mi[0m[38;5;249mo[0m[38;5;249mu[0m[38;5;249ms[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249ms[0m[38;5;249m:[0m[38;5;249m [0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m[[0m[38;5;249m][0m[38;5;249m,[0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249mu[0m[38;5;249ms[0m[38;5;249mT[0m[38;5;249me[0m[38;5;249mx[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m'鎶€鑳芥帓搴忓凡淇濆瓨銆?) {
+ [38;5;240m     │[0m                                                                                            ────────────────┬────────────  
+ [38;5;240m     │[0m                                                                                                            ╰────────────── 
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m09:59:06[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m09:59:40[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:1066:92 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1066 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249ma[0m[38;5;249ms[0m[38;5;249my[0m[38;5;249mn[0m[38;5;249mc[0m[38;5;249m [0m[38;5;249mf[0m[38;5;249mu[0m[38;5;249mn[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mi[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249m [0m[38;5;249ms[0m[38;5;249ma[0m[38;5;249mv[0m[38;5;249me[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249mO[0m[38;5;249mr[0m[38;5;249md[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249m([0m[38;5;249mn[0m[38;5;249me[0m[38;5;249mx[0m[38;5;249mt[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249ms[0m[38;5;249m:[0m[38;5;249m [0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m[[0m[38;5;249m][0m[38;5;249m,[0m[38;5;249m [0m[38;5;249mp[0m[38;5;249mr[0m[38;5;249me[0m[38;5;249mv[0m[38;5;249mi[0m[38;5;249mo[0m[38;5;249mu[0m[38;5;249ms[0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249ms[0m[38;5;249m:[0m[38;5;249m [0m[38;5;249mS[0m[38;5;249mk[0m[38;5;249mi[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m[[0m[38;5;249m][0m[38;5;249m,[0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249mu[0m[38;5;249ms[0m[38;5;249mT[0m[38;5;249me[0m[38;5;249mx[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m'鎶€鑳芥帓搴忓凡淇濆瓨銆?) {
+ [38;5;240m     │[0m                                                                                            ────────────────┬────────────  
+ [38;5;240m     │[0m                                                                                                            ╰────────────── 
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m09:59:40[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m10:54:42[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mExpected `>` but found `)`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/components/ProjectsPanel.tsx:938:29 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m938 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m)[38;5;249m}[0m
+ [38;5;240m    │[0m                             ┬  
+ [38;5;240m    │[0m                             ╰── `>` expected
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/components/ProjectsPanel.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m10:54:42[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/components/ProjectsPanel.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m10:55:30[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mExpected `>` but found `)`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/components/ProjectsPanel.tsx:938:29 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m938 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m)[38;5;249m}[0m
+ [38;5;240m    │[0m                             ┬  
+ [38;5;240m    │[0m                             ╰── `>` expected
+[38;5;246m─────╯[0m
+
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/components/ProjectsPanel.tsx[39m
+[2m10:55:30[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m10:40:11[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:455:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m455 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249me[0m[38;5;249mg[0m[38;5;249mo[0m[38;5;249mr[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0m'鑷畾涔?,
+ [38;5;240m    │[0m             ──────┬────  
+ [38;5;240m    │[0m                   ╰────── 
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m10:40:11[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m10:41:52[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:455:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m455 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249me[0m[38;5;249mg[0m[38;5;249mo[0m[38;5;249mr[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0m'鑷畾涔?,
+ [38;5;240m    │[0m             ──────┬────  
+ [38;5;240m    │[0m                   ╰────── 
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m10:41:52[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m10:42:33[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:455:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m455 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249me[0m[38;5;249mg[0m[38;5;249mo[0m[38;5;249mr[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0m'鑷畾涔?,
+ [38;5;240m    │[0m             ──────┬────  
+ [38;5;240m    │[0m                   ╰────── 
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m10:42:33[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m10:43:25[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:448:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m448 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249me[0m[38;5;249mg[0m[38;5;249mo[0m[38;5;249mr[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0m'鑷畾涔?,
+ [38;5;240m    │[0m             ──────┬────  
+ [38;5;240m    │[0m                   ╰────── 
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m10:43:25[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m10:43:44[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:448:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m448 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249me[0m[38;5;249mg[0m[38;5;249mo[0m[38;5;249mr[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0m'鑷畾涔?,
+ [38;5;240m    │[0m             ──────┬────  
+ [38;5;240m    │[0m                   ╰────── 
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m10:43:44[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m10:44:02[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:448:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m448 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249ma[0m[38;5;249mt[0m[38;5;249me[0m[38;5;249mg[0m[38;5;249mo[0m[38;5;249mr[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0m'鑷畾涔?,
+ [38;5;240m    │[0m             ──────┬────  
+ [38;5;240m    │[0m                   ╰────── 
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m10:44:02[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m11:32:17[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mMissing initializer in const declaration
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:492:7 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m492 │[0m [38;5;249mc[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249m [0mfallbackSkills
+ [38;5;240m    │[0m       ───────┬──────  
+ [38;5;240m    │[0m              ╰──────── 
+ [38;5;240m    │[0m 
+ [38;5;240m    │[0m [38;5;115mHelp[0m: Add an initializer (e.g. ` = undefined`) here
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m11:32:17[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m14:36:37[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mMissing initializer in const declaration
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/App.tsx:504:7 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m504 │[0m [38;5;249mc[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249m [0mfallbackSkills
+ [38;5;240m    │[0m       ───────┬──────  
+ [38;5;240m    │[0m              ╰──────── 
+ [38;5;240m    │[0m 
+ [38;5;240m    │[0m [38;5;115mHelp[0m: Add an initializer (e.g. ` = undefined`) here
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/codex/软件/skill技能工具/randian-skills/app/src/App.tsx[39m
+      at transformWithOxc (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3344:19)
+      at TransformPluginContext.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:3415:26)
+      at EnvironmentPluginContainer.transform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:30387:51)
+      at async loadAndTransform (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24646:26)
+      at async viteTransformMiddleware (file:///D:/codex/%E8%BD%AF%E4%BB%B6/skill%E6%8A%80%E8%83%BD%E5%B7%A5%E5%85%B7/randian-skills/app/node_modules/vite/dist/node/chunks/node.js:24440:20)
+[2m14:36:37[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
