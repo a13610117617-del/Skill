@@ -1,0 +1,50 @@
+Error: No available compatible accounts
+    at callOpenAIImage (file:///R:/app/server/index.js:2646:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async callOpenAIImageWithRetry (file:///R:/app/server/index.js:2938:14)
+    at async file:///R:/app/server/index.js:4168:20
+Error: No available compatible accounts
+    at callOpenAIImage (file:///R:/app/server/index.js:2646:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async callOpenAIImageWithRetry (file:///R:/app/server/index.js:2938:14)
+    at async file:///R:/app/server/index.js:4168:20
+Error: No available compatible accounts
+    at callOpenAIImage (file:///R:/app/server/index.js:2646:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async callOpenAIImageWithRetry (file:///R:/app/server/index.js:2938:14)
+    at async file:///R:/app/server/index.js:4168:20
+Error: No available compatible accounts
+    at callOpenAIImage (file:///R:/app/server/index.js:2646:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async callOpenAIImageWithRetry (file:///R:/app/server/index.js:2938:14)
+    at async file:///R:/app/server/index.js:4168:20
+Error: No available compatible accounts
+    at callOpenAIImage (file:///R:/app/server/index.js:2646:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async callOpenAIImageWithRetry (file:///R:/app/server/index.js:2938:14)
+    at async file:///R:/app/server/index.js:4168:20
+Error: No available compatible accounts
+    at callOpenAIImage (file:///R:/app/server/index.js:2646:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async callOpenAIImageWithRetry (file:///R:/app/server/index.js:2938:14)
+    at async file:///R:/app/server/index.js:4168:20
+Error: No available compatible accounts
+    at callOpenAIImage (file:///R:/app/server/index.js:2646:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async callOpenAIImageWithRetry (file:///R:/app/server/index.js:2938:14)
+    at async file:///R:/app/server/index.js:4168:20
+Error: No available compatible accounts
+    at callOpenAIImage (file:///R:/app/server/index.js:2646:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async callOpenAIImageWithRetry (file:///R:/app/server/index.js:2938:14)
+    at async file:///R:/app/server/index.js:4168:20
+Error: No available compatible accounts
+    at callOpenAIImage (file:///R:/app/server/index.js:2646:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async callOpenAIImageWithRetry (file:///R:/app/server/index.js:2938:14)
+    at async file:///R:/app/server/index.js:4168:20
+Error: No available compatible accounts
+    at callOpenAIImage (file:///R:/app/server/index.js:2646:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async callOpenAIImageWithRetry (file:///R:/app/server/index.js:2938:14)
+    at async file:///R:/app/server/index.js:4168:20
