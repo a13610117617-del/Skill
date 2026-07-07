@@ -6,6 +6,7 @@ type ProjectImage = {
   title: string
   prompt?: string
   compactPrompt?: string
+  debugFinalPrompt?: string
   imageModel?: string
   size?: string
   directionId?: string
@@ -218,6 +219,17 @@ function getReferenceLabel(url: string, index: number) {
   return `参考 ${index + 1}`
 }
 
+function getReferenceLightboxItems(referenceImageUrls: string[]) {
+  return referenceImageUrls.map((referenceUrl, referenceIndex) => ({
+    imageUrl: referenceUrl,
+    title: getReferenceLabel(referenceUrl, referenceIndex),
+  }))
+}
+
+function getDisplayPrompt(image: ProjectImage) {
+  return image.prompt || image.compactPrompt || image.debugFinalPrompt || ''
+}
+
 export function ProjectsPanel(props: ProjectsPanelProps) {
   const { open, loading, projects, onClose, onOpenLightbox, onDownload, onDownloadMany, onDeleteProjects, onReuseImageSettings, onToggleFavorite, onError } = props
   const [selectionMode, setSelectionMode] = useState(false)
@@ -265,7 +277,7 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
         project.brief,
         project.createdAt,
         project.updatedAt,
-        ...project.images.flatMap((image) => [image.title, image.prompt, image.compactPrompt, image.imageModel, image.size]),
+        ...project.images.flatMap((image) => [image.title, image.prompt, image.compactPrompt, image.debugFinalPrompt, image.imageModel, image.size]),
       ]
         .filter(Boolean)
         .join(' ')
@@ -299,7 +311,7 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
             project.brief,
             project.createdAt,
             project.updatedAt,
-            ...project.images.flatMap((image) => [image.title, image.prompt, image.compactPrompt, image.imageModel, image.size]),
+          ...project.images.flatMap((image) => [image.title, image.prompt, image.compactPrompt, image.debugFinalPrompt, image.imageModel, image.size]),
           ]
             .filter(Boolean)
             .join(' ')
@@ -923,15 +935,22 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
                         </figcaption>
                         {image.referenceImageUrls && image.referenceImageUrls.length > 0 && (
                           <div className="project-reference-strip" aria-label="生成参考图">
-                            {image.referenceImageUrls.map((referenceUrl, referenceIndex) => (
-                              <figure key={`${image.imageUrl}-ref-${referenceUrl}-${referenceIndex}`}>
-                                <img src={referenceUrl} alt={getReferenceLabel(referenceUrl, referenceIndex)} />
-                                <figcaption>{getReferenceLabel(referenceUrl, referenceIndex)}</figcaption>
+                            {getReferenceLightboxItems(image.referenceImageUrls).map((referenceItem, referenceIndex, referenceItems) => (
+                              <figure key={`${image.imageUrl}-ref-${referenceItem.imageUrl}-${referenceIndex}`}>
+                                <button
+                                  type="button"
+                                  className="project-reference-preview"
+                                  aria-label={`放大查看${referenceItem.title}`}
+                                  onClick={() => onOpenLightbox(referenceItem.imageUrl, referenceItem.title, referenceItems)}
+                                >
+                                  <img src={referenceItem.imageUrl} alt={referenceItem.title} />
+                                </button>
+                                <figcaption>{referenceItem.title}</figcaption>
                               </figure>
                             ))}
                           </div>
                         )}
-                        {image.prompt && (
+                        {getDisplayPrompt(image) && (
                           <div className="project-prompt-preview">
                             <button
                               type="button"
@@ -942,13 +961,13 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
                                 event.stopPropagation()
                                 setExpandedPrompt({
                                   title: image.title || project.skillDisplayName,
-                                  prompt: image.prompt || '',
+                                  prompt: getDisplayPrompt(image),
                                 })
                               }}
                             >
                               <ExpandPromptIcon />
                             </button>
-                            <textarea readOnly value={image.prompt} />
+                            <textarea readOnly value={getDisplayPrompt(image)} />
                           </div>
                         )}
                         {!selectionMode && (

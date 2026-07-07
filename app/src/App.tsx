@@ -331,7 +331,7 @@ type MultiAngleSlot = {
 }
 
 type MergeImageSlot = {
-  id: 'product' | 'background' | 'angle' | 'model'
+  id: 'product' | 'background' | 'angle' | 'angleHand' | 'model'
   label: string
   hint: string
 }
@@ -399,6 +399,7 @@ type ProjectImage = {
   title: string
   prompt?: string
   compactPrompt?: string
+  debugFinalPrompt?: string
   imageModel?: string
   size?: string
   createdAt?: string
@@ -458,6 +459,7 @@ const mergeImageSlots: MergeImageSlot[] = [
   { id: 'product', label: '产品鞋图', hint: '锁定鞋款、颜色、材质、扣环、鞋跟和所有细节' },
   { id: 'background', label: '背景图', hint: '锁定墙面、地面、空间、光线和阴影方向' },
   { id: 'angle', label: '角度参考图', hint: '黄=鞋子角度，蓝=腿，红=衣服，黑=背景区域' },
+  { id: 'angleHand', label: '角度参考图（含手）', hint: '用于手持、手扶、手拿鞋等含手部动作的角度参考' },
   { id: 'model', label: '模特参考图', hint: '可选：按蓝/红区域参考腿部和穿搭' },
 ]
 
@@ -519,215 +521,37 @@ const mergeImageStrictReferenceLogic = [
 ].join('\n')
 
 function buildUploadedAngleGenerationPrompt(uploadedAngleAnalysis = '') {
-  const analysisBlock = uploadedAngleAnalysis.trim()
-    ? [
-        '【上传角度图分析结果（由上传角度分析提示词生成，必须融入本套专用提示词执行）】',
-        '',
-        '以下分析结果用于把上传角度参考图里的构图、姿势、色块边界、脚尖方向、鞋跟方向、身体朝向、透视关系和裁切关系加入本套上传角度图专用生成提示词中。',
-        '分析结果不能覆盖产品鞋图的产品外观控制，不能覆盖背景图的环境控制，不能把角度图当作鞋款、服装、背景或材质参考。',
-        '',
-        uploadedAngleAnalysis.trim(),
-        '',
-        '执行方式：最终生成时，先遵守本套上传角度图专用提示词的固定规则，再把以上分析结果作为构图与姿势细化说明一起执行。若分析文字与上传角度图本身冲突，以上传角度图视觉内容为准；若与产品鞋图冲突，以产品鞋图为准。',
-      ].join('\n')
-    : [
-        '【上传角度图分析结果】',
-        '',
-        '未获得额外智能分析结果。直接按照上传角度参考图本身的色块区域、构图、姿势、脚部角度、透视关系和裁切关系执行。',
-      ].join('\n')
-
+  const isRealPhotoAngle = uploadedAngleAnalysis.includes('REAL PHOTO ANGLE REFERENCE')
+  if (isRealPhotoAngle) {
+    return [
+      'USER-UPLOADED REAL PHOTO ANGLE REFERENCE PROMPT:',
+      'The uploaded angle reference is a real photo, not a yellow/blue/red/black semantic color-block mask.',
+      'Directly follow the original real photo for camera view, shooting height, lens perspective, crop, body pose, hand/foot relationship, shoe count, shoe placement, shoe direction, scale, overlap, and occlusion.',
+      'Do not invent semantic mask colors or color-block behavior. Do not require yellow/blue/red/black regions when the uploaded angle reference is a real photo.',
+      'Replace only the product shoe identity with the uploaded product shoe, keep the real-photo angle and composition relationship.',
+      'Preserve premium commercial photography quality: realistic light, natural shadows, leather texture, clean background, refined ecommerce catalog look.',
+      uploadedAngleAnalysis.trim(),
+    ].filter(Boolean).join('\n')
+  }
   return [
-  'USER-UPLOADED ANGLE REFERENCE GENERATION PROMPT: this block applies only when the user uploads an angle reference image. It must not change the angle-library prompts or the common global merge prompt.',
-  'Universal uploaded-angle rule: the uploaded angle reference image is the hard visual template for pose, composition, shoe count, shoe placement, shoe direction, camera angle, crop, perspective, scale, overlap, occlusion, and body-to-shoe relationship. The final generation must visually follow the uploaded angle image itself, not a guessed pose from text alone.',
-  'The uploaded angle reference may be a color-block semantic mask, a real photo, a sketch, a layout guide, or a mixed reference. Always read it as a layout/pose template only. Never use it as the source of product shoe design, shoe material, clothing design, background style, color palette, brand, text, or final visual texture.',
-  'If the uploaded angle reference is a color-block mask, use this mapping strictly: yellow = product shoe area and shoe placement/angle, blue = visible body limb area such as leg/foot/ankle/hand/arm, red = clothing area, black = background/empty environment area. If the image is not a color-block mask, infer the same roles from the visible shoes, feet, legs, clothing, hands, crop, and camera perspective.',
-  'Object-count rule: determine the number of real shoe objects by the whole visual intent of the uploaded angle image, not by the number of disconnected color fragments. Shoe straps, buckles, openings, toe gaps, heel gaps, lace gaps, stitching lines, inner shadows, black holes inside a yellow shoe, and separated yellow accessory pieces belong to their nearest main shoe object and must not be counted as extra shoes. Do not invent extra shoes beyond the uploaded angle image. Do not delete a main shoe that is clearly present.',
-  'Region-boundary rule for masks: preserve the main outline, bounding box, placement, direction, scale, and overlap of each semantic region. Internal black marks or holes enclosed by a yellow shoe region are shoe openings, strap gaps, inner shadows, or product-detail gaps, not background zones. Only the large exterior black/empty canvas areas are background. Thin dividing lines inside yellow, blue, or red areas should guide detail/occlusion but must not split one object into multiple objects.',
-  'Shoe-direction lock: infer toe direction, heel direction, shoe rotation, left-foot/right-foot identity, worn-vs-display status, contact point, perspective, and whether each shoe is connected to a blue limb or independent. The generated product shoes must keep the same direction and perspective as the uploaded angle reference. Do not flip, reverse, rotate, swap left/right, change camera side, or reinterpret the body-facing direction.',
-  'Body relationship rule: if a yellow shoe region touches or is visually connected to blue leg/ankle/foot geometry, generate it as a worn shoe connected to that limb. If a yellow shoe region is not connected to a blue limb, generate it as a display/ground/foreground/handheld product shoe according to the uploaded angle image; do not add an extra leg or foot unless the uploaded angle image clearly requires one. If blue regions represent hands or arms rather than legs, generate hands/arms only in those regions and keep the shoe relationship from the reference.',
-  'Product lock: every generated shoe must come from the uploaded product shoe image as the only source of shoe identity, shape, color, material, toe, heel, sole, straps, buckles, stitching, lining, and proportions. The uploaded angle image controls only where and how that product appears. Adapt the product shoe only through rotation, perspective, scale, side mirroring, occlusion, and contact required by the uploaded angle reference.',
-  'Reference separation: clothing must come from the uploaded model reference image if provided and stay within the role/area indicated by the uploaded angle image. Background must come from the uploaded background image and fill only the environment/empty areas. Final output must not show mask colors, color-block edges, flat semantic silhouettes, labels, text, watermark, or collage artifacts.',
-  '',
-  analysisBlock,
-  '',
-  '【参考图优先级规则】',
-  '',
-  '产品鞋图控制产品外观',
-  '角度参考图 控制构图与姿势',
-  '背景图控制背景环境',
-  '',
-  '严格按照以下优先级执行：',
-  '',
-  '产品 > 构图 > 服装 > 背景',
-  '',
-  '————————————————————————',
-  '',
-  '【产品约束（最高优先级）】',
-  '',
-  '以产品鞋图作为唯一产品参考，',
-  '',
-  '严格保留产品设计，',
-  '',
-  '保持鞋头形状、',
-  '鞋跟形状、',
-  '鞋口形状、',
-  '绑带结构、',
-  '扣件位置、',
-  '鞋底比例、',
-  '材质结构、',
-  '整体轮廓完全一致。',
-  '',
-  '不得重新设计产品，',
-  '不得新增结构，',
-  '不得删减结构，',
-  '不得改变鞋型，',
-  '不得改变产品识别特征。',
-  '',
-  '确保生成结果与参考产品保持同款关系。',
-  '',
-  '————————————————————————',
-  '',
-  '【构图约束（强制执行）】',
-  '',
-  '严格遵循用户上传角度参考图的整体视觉构图生成，',
-  '',
-  '角度参考图可能是色块图、真实照片、草图或混合参考图；',
-  '无论是哪一种，都只用来控制构图、姿势、鞋子数量、鞋子位置、脚尖方向、鞋跟方向、透视、裁切、遮挡和主体比例。',
-  '',
-  '红色区域 = 服装区域',
-  '蓝色区域 = 腿部区域',
-  '黄色区域 = 产品区域',
-  '黑色区域 = 背景区域',
-  '',
-  '服装仅允许出现在红色区域内。',
-  '',
-  '腿部仅允许出现在蓝色区域内。',
-  '',
-  '鞋子仅允许出现在黄色区域内。',
-  '',
-  '背景仅允许出现在黑色区域内。',
-  '',
-  '如果上传角度图不是标准色块图，',
-  '则根据图中真实鞋子、脚部、腿部、服装、手部、主体轮廓、相机角度和裁切关系推断以上区域角色。',
-  '',
-  '鞋子数量必须按照角度参考图里的真实主鞋对象数量生成，',
-  '不得把鞋带、扣件、鞋口、鞋面开口、鞋内黑影、缝隙、细线或分离的小色块误判成额外鞋子。',
-  '',
-  '黄色鞋区内部的黑色线条、黑色洞口、镂空、阴影和分割线，',
-  '属于鞋子内部结构或遮挡关系，',
-  '不是背景区域，',
-  '不得因此拆分鞋子数量或改变鞋子角度。',
-  '',
-  '保持色块边界一致，',
-  '保持人物姿态一致，',
-  '保持脚部角度一致，',
-  '保持画面比例一致，',
-  '保持主体位置一致。',
-  '',
-  '不得修改色块轮廓，',
-  '不得改变构图结构，',
-  '不得改变透视关系。',
-  '',
-  '————————————————————————',
-  '',
-  '【服装约束】',
-  '',
-  '根据模特参考图生成服装，',
-  '',
-  '保持服装颜色、',
-  '面料纹理、',
-  '垂坠感、',
-  '面料厚度、',
-  '裙摆长度、',
-  '裙摆轮廓、',
-  '褶皱分布特征。',
-  '',
-  '服装必须严格限制在红色区域内部。',
-  '',
-  '不得超出红色区域边界。',
-  '',
-  '————————————————————————',
-  '',
-  '【腿部约束】',
-  '',
-  '根据蓝色区域生成真实女性腿部，',
-  '',
-  '自然肤色，',
-  '真实皮肤质感，',
-  '比例正确，',
-  '结构准确，',
-  '姿态自然优雅。',
-  '',
-  '不出现上半身，',
-  '不出现头部，',
-  '',
-  '————————————————————————',
-  '',
-  '【背景约束】',
-  '',
-  '根据背景图生成背景，',
-  '',
-  '保持墙面颜色，',
-  '保持地面颜色，',
-  '保持踢脚线位置，',
-  '保持透视关系，',
-  '保持地平线高度，',
-  '保持空间结构，',
-  '保持光线方向。',
-  '',
-  '背景仅允许出现在黑色区域内。',
-  '',
-  '允许轻微材质变化，',
-  '但整体风格必须一致。',
-  '',
-  '————————————————————————',
-  '',
-  '【摄影风格】',
-  '',
-  '高端女鞋商业广告摄影，',
-  '',
-  '高级电商详情页风格，',
-  '',
-  '极简摄影棚场景，',
-  '',
-  '柔光箱布光，',
-  '',
-  '高Key光照，',
-  '',
-  '自然阴影，',
-  '',
-  '85mm镜头，',
-  '',
-  '真实皮革质感，',
-  '',
-  '真实接触阴影，',
-  '',
-  '高端商业摄影，',
-  '',
-  '超写实，',
-  '',
-  '照片级真实感，',
-  '',
-  '8K高清细节，',
-  '',
-  '专业产品摄影。',
-  '',
-  'photorealistic,',
-  'luxury footwear advertising,',
-  'commercial product photography,',
-  'editorial fashion photography,',
-  'soft studio lighting,',
-  'high key lighting,',
-  'premium leather texture,',
-  'realistic shadow,',
-  '85mm lens,',
-  'ultra realistic,',
-  '8k,',
-  'sharp focus,',
-  'professional catalog photography',
-  ].join('\n')
+    'USER-UPLOADED ANGLE REFERENCE CONCISE PROMPT:',
+    'The uploaded angle reference itself is the primary pose and composition control, not the text notes. Directly observe this uploaded image for body pose, foot/shoe spatial relationship, camera angle, perspective, scale, and occlusion. Any code analysis or text explanation is auxiliary; if text conflicts with the uploaded angle image, follow the uploaded angle image.',
+    'The uploaded angle reference is a semantic region mask, not a style image. Read its visual regions from the image itself, then replace each region with content from the correct reference.',
+    'Use the uploaded angle reference only for pose, composition, shoe count, shoe placement, shoe direction, camera angle, crop, perspective, scale, overlap, occlusion, and body-to-shoe relationship.',
+    'Use the code-generated structured angle schema from angleLayout as the main layout instruction. Do not treat the control image as visual style.',
+    'Yellow/S regions = shoe angle and placement reference only. They indicate where shoes appear and how they are placed, including shoe position, size, orientation, toe direction, heel direction, left-foot/right-foot side inference, body-facing direction inference, heel position, perspective, worn/display/handheld role, scale, and occlusion. Do not use the uploaded angle reference, yellow/S mask, or cleaned control image as shoe appearance, shoe silhouette, shoe design, shoe color, material, style, shape, toe shape, heel shape, sole shape, strap/lace/buckle design, or product proportions. Generate the uploaded product shoe in each yellow/S region, using the product shoe image as the only and 100% authoritative source for shoe shape, color, material, texture, straps, buckle, heel, sole, toe shape, stitching, lining, and proportions. A yellow/S region connected to a blue leg/ankle/foot region is a worn shoe on the foot; a yellow/S region connected to a blue hand/wrist/finger region is handheld or hand-supported; a yellow/S region not connected to any blue limb is a ground or foreground display shoe only, so generate only the product shoe there and do not add an extra leg or foot.',
+    'Blue/B regions = body limb regions. Identify each blue/B region by its silhouette and position: it may be a leg, foot/ankle segment, arm, hand, wrist, finger detail, or minor body detail. Generate the matching natural female body part in every meaningful blue/B region. Limb pose, joint direction, occlusion, body angle, and connection to shoes must follow the uploaded angle mask and code-generated binding explanation, while skin tone and styling can come from the model reference.',
+    'Red/R regions = clothing support regions. Generate the real outfit type from the uploaded model reference only as supporting styling around the product shoes. Match the model reference clothing category, color, fabric, drape, silhouette, waistband/hem details, and styling, but clothing must not become the main visual subject or occupy attention beyond the red/R mask intent. Do not invent a skirt/dress if the model reference is wearing pants, jeans, shorts, or a top. Do not copy the model reference shoes.',
+    'Black/background regions = background regions. Generate the uploaded background image environment in all black/empty regions, including wall, floor, baseboard, light direction, atmosphere, perspective, and shadows.',
+    'Priority order: product shoe as the main visual subject > uploaded angle mask pose/composition and yellow/S shoe placement/angle reference > body limbs that support the shoe display > model outfit as secondary styling only > background realism. Product shoe appearance must come 100% from the product shoe image only; the uploaded angle reference, yellow/S regions, and cleaned control image control only placement, angle, scale, perspective, role, and occlusion, never shoe exterior design or silhouette.',
+    'Final image: one realistic ecommerce product-shoe hero scene focused on the lower body only. The uploaded product shoes must be the clearest main subject and visual focus. Body limbs, clothing, camera angle, perspective, scale, and occlusion follow the uploaded angle reference, but clothing stays secondary and must not dominate the image. Background comes only from the background image.',
+    'Lower-body crop rule: do not generate the model face, head, portrait, or full upper body. Show only the lower body needed for the shoe display, such as legs, feet, hands, skirt hem, pants hem, or partial waist when required by the uploaded angle reference. If the uploaded angle reference does not show the upper body, keep the upper body outside the frame.',
+    'Never render mask colors, grid lines, labels, flat color-block silhouettes, or control-image artifacts.',
+    'Forbidden: any visible semantic mask colors or color-block shapes from the uploaded angle reference or cleaned control image, including yellow blocks, blue blocks, red blocks, black blocks, gray/white control guide marks, flat colored silhouettes, tinted mask remnants, yellow shoes from the mask, blue limbs, red block clothing, black mask background, model face, head, portrait, full upper body, model reference shoes, model reference background/wall/floor/shadows/watermark/props, extra shoes, extra limbs, deformed hands or feet, wrong toes or fingers, text, watermark, logo, collage look.',
+    'Preserve premium commercial photography quality: realistic light, natural shadows, leather texture, clean background, refined ecommerce catalog look.',
+    uploadedAngleAnalysis.trim(),
+  ].filter(Boolean).join('\n')
 }
-
 const fallbackSkills: Skill[] = [
   {
     id: 'ai-merge-image-skill-local',
@@ -990,7 +814,7 @@ function App() {
   const [multiAngleFiles, setMultiAngleFiles] = useState<Record<string, File[]>>({})
   const [mergeImageFiles, setMergeImageFiles] = useState<Record<string, File[]>>({})
   const [draggingMergeImageSlot, setDraggingMergeImageSlot] = useState('')
-  const [mergeReferenceModalSlot, setMergeReferenceModalSlot] = useState<'angle' | ''>('')
+  const [mergeReferenceModalSlot, setMergeReferenceModalSlot] = useState<'angle' | 'angleHand' | ''>('')
   const [selectedMergeAngleIds, setSelectedMergeAngleIds] = useState<string[]>([])
   const [mergeAngleLibraryAnalyses, setMergeAngleLibraryAnalyses] = useState<Record<string, string>>({})
   const [mergeImageSize, setMergeImageSize] = useState('auto')
@@ -1283,10 +1107,10 @@ function App() {
   }, [mergeImagePreviewUrls])
 
   useEffect(() => {
-    if (mergeReferenceModalSlot === 'angle' && (mergeImageFiles.angle || []).length === 0) {
+    if (mergeReferenceModalSlot && (mergeImageFiles[mergeReferenceModalSlot] || []).length === 0) {
       setMergeReferenceModalSlot('')
     }
-  }, [mergeImageFiles.angle, mergeReferenceModalSlot])
+  }, [mergeImageFiles, mergeReferenceModalSlot])
 
   useEffect(() => {
     if (!isMergeImageSkill) return
@@ -2023,11 +1847,11 @@ function App() {
     setError('')
     setMergeImageFiles((current) => ({
       ...current,
-      [slotId]: slotId === 'angle'
+      [slotId]: slotId === 'angle' || slotId === 'angleHand'
         ? [...(current[slotId] || []), ...images].slice(0, mergeAngleBatchLimit)
         : [images[0]],
     }))
-    if (slotId === 'angle') setSelectedMergeAngleIds([])
+    if (slotId === 'angle' || slotId === 'angleHand') setSelectedMergeAngleIds([])
   }
 
   function handleMergeImageDragOver(event: DragEvent<HTMLElement>, slotId: string) {
@@ -2212,7 +2036,7 @@ function App() {
       const cameraNotes = [
         mainShoe && mainShoe.centerY > 58 ? 'camera frames shoes in the lower half with feet as foreground priority' : 'camera keeps shoes around mid-frame',
         mainLimb && mainLimb.top < 10 ? 'blue limbs enter from upper edge, implying cropped fashion/product photo framing' : 'blue limbs are partially visible and cropped by the composition',
-        yellow.length >= 2 ? 'detected ' + yellow.length + ' yellow connected components, but connected-component count may be larger than the real shoe count when straps, buckles, openings, stitching, lace gaps, inner shadows, or separated detail pieces split one shoe into fragments. Read the uploaded angle image visually and merge nearby yellow fragments that belong to the same shoe object. Use the final main shoe objects only for shoe count, placement, angle, size, orientation, toe direction, heel contact, scale, and perspective. Generate shoe appearance only from the uploaded product shoe image. Only yellow main shoe objects connected to blue leg/ankle/foot regions are worn shoes; yellow main shoe objects not connected to blue limbs are ground, display, foreground, or handheld shoes and must not create extra legs or feet' : 'single main shoe placement reference region dominates the composition',
+        yellow.length >= 2 ? 'raw yellow fragments detected, but this raw connected-component count is not the real shoe count. The cleaned control MAIN SHOE COUNT LOCK is authoritative. Straps, buckles, openings, stitching, lace gaps, inner shadows, separated detail pieces, or overlapping shoe silhouettes may split or connect raw yellow regions. Use the cleaned control S objects only for real shoe count, placement, angle, size, orientation, toe direction, heel contact, scale, and perspective. Generate shoe appearance only from the uploaded product shoe image. Only cleaned-control S objects connected to blue leg/ankle/foot regions are worn shoes; non-connected S objects are ground, display, foreground, or handheld shoes and must not create extra legs or feet' : 'single raw yellow placement region observed; still use the cleaned control MAIN SHOE COUNT LOCK as authoritative',
         red.length ? 'model outfit must occupy the red clothing support region and align with the body-limb origin; use the actual clothing type from the model reference but keep it secondary to the product shoes' : 'no large clothing block detected; keep clothing minimal or cropped out unless model reference requires it',
       ].filter(Boolean)
 
@@ -2221,7 +2045,7 @@ function App() {
         'Uploaded-angle semantic analysis for ' + sourceLabel + ': this image is a semantic pose/composition template, not a style/color/material reference. If this is a color-block image, use the color mapping below; if it is a real photo, sketch, or mixed reference, infer equivalent shoe/body/clothing/background roles from the visible layout.',
         'Color meaning for masks: yellow=shoe angle/placement reference only, blue=body limb region that must be identified by silhouette as leg/ankle/foot or arm/hand/wrist, red=secondary model outfit/clothing support area, black=background from uploaded background image. No visible yellow/blue/red/black color blocks or tinted mask remnants may appear in the final image.',
         'Universal object-count rule: count real main shoe objects from the overall visual intent, not from disconnected color fragments. Shoe straps, buckles, openings, toe gaps, heel gaps, lace gaps, stitching, internal black holes, inner shadows, and thin dividing lines belong to the nearest main shoe and must not become extra shoes. Internal black marks inside a shoe are shoe openings/details, not background.',
-        yellow.length ? 'Yellow shoe placement reference components detected: ' + yellow.map(describeShoe).join(' | ') + ' Merge nearby components into the same main shoe when they are straps, openings, buckles, or detail fragments of one shoe.' : 'Yellow shoe placement reference regions: none detected; do not invent extra shoes beyond visible uploaded-angle intent.',
+        yellow.length ? 'Raw yellow placement fragments observed, not authoritative shoe count: ' + yellow.map(describeShoe).join(' | ') + ' Do not count these raw fragments as shoes. The cleaned control MAIN SHOE COUNT LOCK and S labels are authoritative; merge straps, openings, buckles, detail fragments, and split/overlapping shoe pieces into the real main shoe objects.' : 'Yellow shoe placement reference regions: none detected; do not invent extra shoes beyond visible uploaded-angle intent.',
         blue.length ? 'Blue body-limb regions: ' + blue.map(describeBlueLimb).join(' | ') : 'Blue body-limb regions: none detected; do not invent extra limbs unless required by shoe-on-foot context.',
         red.length ? 'Red clothing regions: ' + red.map(describeClothing).join(' | ') : 'Red clothing regions: none detected; if model is uploaded, use only cropped/minimal outfit consistent with the mask.',
         'Black background regions: ' + blackText,
@@ -2263,6 +2087,41 @@ function App() {
         else if (b > 110 && r < 135 && g < 170 && b > r * 1.15 && b > g * 1.05) masks.blue[index] = 1
         else if (r > 135 && g < 130 && b < 130 && r > g * 1.2 && r > b * 1.2) masks.red[index] = 1
         else if (r < 55 && g < 55 && b < 55) masks.black[index] = 1
+      }
+
+      const totalPixels = Math.max(1, width * height)
+      const maskCounts = {
+        yellow: masks.yellow.reduce((sum, value) => sum + value, 0),
+        blue: masks.blue.reduce((sum, value) => sum + value, 0),
+        red: masks.red.reduce((sum, value) => sum + value, 0),
+        black: masks.black.reduce((sum, value) => sum + value, 0),
+      }
+      const yellowRatio = maskCounts.yellow / totalPixels
+      const blueRatio = maskCounts.blue / totalPixels
+      const redRatio = maskCounts.red / totalPixels
+      const blackRatio = maskCounts.black / totalPixels
+      const semanticRatio = yellowRatio + blueRatio + redRatio
+      const meaningfulSemanticColors = [yellowRatio, blueRatio, redRatio].filter((ratio) => ratio >= 0.003).length
+      const looksLikeColorBlockMask =
+        yellowRatio >= 0.0025 &&
+        blueRatio >= 0.0025 &&
+        semanticRatio >= 0.018 &&
+        meaningfulSemanticColors >= 2 &&
+        (blackRatio >= 0.12 || redRatio >= 0.003 || semanticRatio >= 0.06)
+
+      if (!looksLikeColorBlockMask) {
+        const fileLabel = file.name || 'uploaded angle reference'
+        return {
+          file: null,
+          layout: [
+            'REAL PHOTO ANGLE REFERENCE:',
+            `Uploaded file "${fileLabel}" is detected as a real photo / non-color-block angle reference, so no cleaned color-mask control image was generated.`,
+            'Use the original uploaded angle reference image itself as the strongest pose and camera reference.',
+            'Follow its real camera viewpoint, shooting height, lens perspective, crop, subject location, foot/hand/body relationship, shoe count, shoe placement, shoe direction, scale, overlap, and occlusion.',
+            'Do not interpret this real photo as yellow=shoes, blue=limbs, red=clothing, black=background. Do not generate or preserve any mask colors.',
+            'Use the product shoe image only for shoe identity and details. Use the background image only for the final environment. If a model reference is uploaded, use it only for outfit and body styling.',
+          ].join('\n'),
+        }
       }
 
       type AngleComponent = { minX: number; minY: number; maxX: number; maxY: number; count: number }
@@ -2326,7 +2185,7 @@ function App() {
         maxY: Math.max(a.maxY, b.maxY),
         count: a.count + b.count,
       })
-      const mergeNearby = (components: AngleComponent[]) => {
+      const mergeNearby = (components: AngleComponent[], ratio = 0.18) => {
         const merged: AngleComponent[] = []
         for (const component of components) {
           let current = component
@@ -2334,7 +2193,7 @@ function App() {
           while (didMerge) {
             didMerge = false
             for (let index = 0; index < merged.length; index += 1) {
-              if (boxesOverlap(expandBox(current, 0.18), expandBox(merged[index], 0.18))) {
+              if (boxesOverlap(expandBox(current, ratio), expandBox(merged[index], ratio))) {
                 current = unionBox(current, merged[index])
                 merged.splice(index, 1)
                 didMerge = true
@@ -2346,18 +2205,257 @@ function App() {
         }
         return merged.sort((a, b) => b.count - a.count)
       }
+      const componentAreaRatio = (component: AngleComponent) => component.count / (width * height)
+      const boxAreaRatio = (component: AngleComponent) => {
+        const boxWidth = component.maxX - component.minX + 1
+        const boxHeight = component.maxY - component.minY + 1
+        return (boxWidth * boxHeight) / (width * height)
+      }
+      const boxCenterDistance = (a: AngleComponent, b: AngleComponent) => {
+        const ax = (a.minX + a.maxX) / 2
+        const ay = (a.minY + a.maxY) / 2
+        const bx = (b.minX + b.maxX) / 2
+        const by = (b.minY + b.maxY) / 2
+        return Math.hypot((ax - bx) / width, (ay - by) / height)
+      }
+      const boxOverlapRatio = (a: AngleComponent, b: AngleComponent) => {
+        const overlapX = Math.max(0, Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) + 1)
+        const overlapY = Math.max(0, Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY) + 1)
+        const overlapArea = overlapX * overlapY
+        const aArea = (a.maxX - a.minX + 1) * (a.maxY - a.minY + 1)
+        const bArea = (b.maxX - b.minX + 1) * (b.maxY - b.minY + 1)
+        return overlapArea / Math.max(1, Math.min(aArea, bArea))
+      }
+      const connectedToAny = (component: AngleComponent, others: AngleComponent[], ratio = 0.12) => touchesAny(component, others, ratio)
+      const yellowPixelContactCount = (a: AngleComponent, b: AngleComponent, expand = 1) => {
+        let count = 0
+        const minX = Math.max(0, Math.min(a.minX, b.minX) - expand)
+        const maxX = Math.min(width - 1, Math.max(a.maxX, b.maxX) + expand)
+        const minY = Math.max(0, Math.min(a.minY, b.minY) - expand)
+        const maxY = Math.min(height - 1, Math.max(a.maxY, b.maxY) + expand)
+        for (let y = minY; y <= maxY; y += 1) {
+          for (let x = minX; x <= maxX; x += 1) {
+            const index = y * width + x
+            if (!masks.yellow[index]) continue
+            let nearOther = false
+            for (let yy = Math.max(0, y - expand); yy <= Math.min(height - 1, y + expand) && !nearOther; yy += 1) {
+              for (let xx = Math.max(0, x - expand); xx <= Math.min(width - 1, x + expand); xx += 1) {
+                const otherIndex = yy * width + xx
+                if (!masks.yellow[otherIndex]) continue
+                const inA = xx >= a.minX && xx <= a.maxX && yy >= a.minY && yy <= a.maxY
+                const inB = xx >= b.minX && xx <= b.maxX && yy >= b.minY && yy <= b.maxY
+                if ((inA && !inB) || (inB && !inA)) {
+                  nearOther = true
+                  break
+                }
+              }
+            }
+            if (nearOther) count += 1
+          }
+        }
+        return count
+      }
+      const splitOverlappedDoubleShoe = (component: AngleComponent): AngleComponent[] => {
+        const boxWidth = component.maxX - component.minX + 1
+        const boxHeight = component.maxY - component.minY + 1
+        const isLargeWideShoeMass = componentAreaRatio(component) > 0.045 && boxWidth > width * 0.35 && boxHeight > height * 0.12
+        if (!isLargeWideShoeMass) return [component]
+
+        const columns = new Array(boxWidth).fill(0)
+        const rows = new Array(boxHeight).fill(0)
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!masks.yellow[index]) continue
+            columns[x - component.minX] += 1
+            rows[y - component.minY] += 1
+          }
+        }
+        const splitCandidates: Array<{ axis: 'x' | 'y'; index: number; score: number }> = []
+        const columnMax = Math.max(...columns, 1)
+        for (let index = Math.round(boxWidth * 0.18); index <= Math.round(boxWidth * 0.82); index += 1) {
+          const value = columns[index] || 0
+          if (value < columnMax * 0.52) splitCandidates.push({ axis: 'x', index, score: value / columnMax })
+        }
+        const rowMax = Math.max(...rows, 1)
+        for (let index = Math.round(boxHeight * 0.18); index <= Math.round(boxHeight * 0.82); index += 1) {
+          const value = rows[index] || 0
+          if (value < rowMax * 0.52) splitCandidates.push({ axis: 'y', index, score: value / rowMax })
+        }
+
+        const buildPart = (best: { axis: 'x' | 'y'; index: number }, side: 'before' | 'after') => {
+          let minX = width
+          let minY = height
+          let maxX = 0
+          let maxY = 0
+          let count = 0
+          for (let y = component.minY; y <= component.maxY; y += 1) {
+            for (let x = component.minX; x <= component.maxX; x += 1) {
+              const index = y * width + x
+              if (!masks.yellow[index]) continue
+              const local = best.axis === 'x' ? x - component.minX : y - component.minY
+              const inPart = side === 'before' ? local <= best.index : local > best.index
+              if (!inPart) continue
+              minX = Math.min(minX, x)
+              minY = Math.min(minY, y)
+              maxX = Math.max(maxX, x)
+              maxY = Math.max(maxY, y)
+              count += 1
+            }
+          }
+          return count > width * height * 0.0025 ? { minX, minY, maxX, maxY, count } : null
+        }
+        const scoredSplits = splitCandidates
+          .map((candidate) => {
+            const before = buildPart(candidate, 'before')
+            const after = buildPart(candidate, 'after')
+            if (!before || !after) return null
+            const beforeConnected = connectedToAny(before, blueComponents, 0.12)
+            const afterConnected = connectedToAny(after, blueComponents, 0.12)
+            const centerDistance = boxCenterDistance(before, after)
+            const contactPixels = yellowPixelContactCount(before, after, 1)
+            const likelyDisplayPlusWorn = beforeConnected !== afterConnected && centerDistance > 0.1
+            const likelyTwoLargeShoes = componentAreaRatio(before) > 0.008 && componentAreaRatio(after) > 0.008 && centerDistance > 0.14
+            const lowBridge = contactPixels < Math.max(28, component.count * 0.025)
+            const partBalance = Math.min(before.count, after.count) / Math.max(before.count, after.count)
+            const score =
+              (likelyDisplayPlusWorn ? 40 : 0) +
+              (likelyTwoLargeShoes ? 24 : 0) +
+              (lowBridge ? 18 : 0) +
+              centerDistance * 30 +
+              partBalance * 20 -
+              candidate.score * 18
+            return { candidate, before, after, likelyDisplayPlusWorn, likelyTwoLargeShoes, lowBridge, score }
+          })
+          .filter(Boolean) as Array<{
+            candidate: { axis: 'x' | 'y'; index: number; score: number }
+            before: AngleComponent
+            after: AngleComponent
+            likelyDisplayPlusWorn: boolean
+            likelyTwoLargeShoes: boolean
+            lowBridge: boolean
+            score: number
+          }>
+        scoredSplits.sort((a, b) => b.score - a.score)
+        const best = scoredSplits[0]
+        if (!best) return [component]
+        return best.likelyDisplayPlusWorn || (best.likelyTwoLargeShoes && best.lowBridge) ? [best.before, best.after] : [component]
+      }
+      const inferWornShoeSupplements = (rawComponents: AngleComponent[], existingShoes: AngleComponent[]) => {
+        const supplements: AngleComponent[] = []
+        for (const limb of blueComponents) {
+          const nearbyYellow = rawComponents.filter((component) => {
+            const tooTiny = componentAreaRatio(component) < 0.00035
+            if (tooTiny) return false
+            if (!boxesOverlap(expandBox(component, 0.24), expandBox(limb, 0.08))) return false
+            const overlap = boxOverlapRatio(expandBox(component, 0.18), expandBox(limb, 0.05))
+            const close = boxCenterDistance(component, limb) < 0.24
+            return overlap > 0.025 || close
+          })
+          if (!nearbyYellow.length) continue
+          const totalYellow = nearbyYellow.reduce((sum, component) => sum + component.count, 0)
+          const hasEnoughStrapsOrEdges = nearbyYellow.length >= 2 || totalYellow > width * height * 0.004
+          if (!hasEnoughStrapsOrEdges) continue
+          const candidate = nearbyYellow.reduce((current, component) => unionBox(current, component))
+          const candidateBoxArea = boxAreaRatio(candidate)
+          if (componentAreaRatio(candidate) < 0.0018 && candidateBoxArea < 0.025) continue
+          const duplicate = existingShoes.some((shoe) => {
+            const shoeBoxArea = boxAreaRatio(shoe)
+            const samePosition = boxCenterDistance(shoe, candidate) < 0.11 || boxOverlapRatio(expandBox(shoe, 0.06), expandBox(candidate, 0.06)) > 0.62
+            const existingIsNotMergedMass = shoeBoxArea < candidateBoxArea * 2.4
+            return samePosition && existingIsNotMergedMass
+          })
+          if (!duplicate) supplements.push(candidate)
+        }
+        return supplements
+      }
+      const dedupeShoes = (components: AngleComponent[]) => {
+        const deduped: AngleComponent[] = []
+        for (const component of components) {
+          const duplicateIndex = deduped.findIndex((existing) =>
+            boxCenterDistance(existing, component) < 0.1 ||
+            (
+              boxOverlapRatio(expandBox(existing, 0.04), expandBox(component, 0.04)) > 0.7 &&
+              Math.max(boxAreaRatio(existing), boxAreaRatio(component)) < Math.min(boxAreaRatio(existing), boxAreaRatio(component)) * 2.2
+            ),
+          )
+          if (duplicateIndex >= 0) {
+            const existing = deduped[duplicateIndex]
+            deduped[duplicateIndex] = component.count > existing.count ? component : existing
+          } else {
+            deduped.push(component)
+          }
+        }
+        return deduped
+      }
+      const absorbShoeDetailsIntoMainShoes = (components: AngleComponent[]) => {
+        const sorted = components.slice().sort((a, b) => b.count - a.count)
+        const mainShoes: AngleComponent[] = []
+        const detailFragments: AngleComponent[] = []
+        for (const component of sorted) {
+          const area = componentAreaRatio(component)
+          const boxArea = boxAreaRatio(component)
+          const boxWidth = component.maxX - component.minX + 1
+          const boxHeight = component.maxY - component.minY + 1
+          const mainLike =
+            area >= 0.014 ||
+            boxArea >= 0.072 ||
+            (boxWidth >= width * 0.18 && boxHeight >= height * 0.1)
+          if (mainLike) mainShoes.push(component)
+          else detailFragments.push(component)
+        }
+        if (!mainShoes.length) return sorted
+        for (const fragment of detailFragments) {
+          let bestIndex = -1
+          let bestScore = 0
+          for (let index = 0; index < mainShoes.length; index += 1) {
+            const main = mainShoes[index]
+            const overlap = boxOverlapRatio(expandBox(fragment, 0.22), expandBox(main, 0.12))
+            const close = boxCenterDistance(fragment, main)
+            const fragmentInsideMainNeighborhood = boxesOverlap(expandBox(fragment, 0.18), expandBox(main, 0.18))
+            const score = overlap * 4 + (fragmentInsideMainNeighborhood ? 1.4 : 0) + Math.max(0, 0.32 - close)
+            if (score > bestScore) {
+              bestScore = score
+              bestIndex = index
+            }
+          }
+          if (bestIndex >= 0 && bestScore >= 1.15) {
+            mainShoes[bestIndex] = unionBox(mainShoes[bestIndex], fragment)
+          }
+        }
+        return mainShoes.sort((a, b) => b.count - a.count)
+      }
       const mergeShoeFragments = (components: AngleComponent[]) => {
-        const main = components.filter((component) => {
+        const candidates = components.filter((component) => {
           const boxWidth = component.maxX - component.minX + 1
           const boxHeight = component.maxY - component.minY + 1
-          return component.count > width * height * 0.006 || (boxWidth > width * 0.12 && boxHeight > height * 0.10)
+          return component.count > width * height * 0.0025 && boxWidth > width * 0.035 && boxHeight > height * 0.035
         })
-        const fallback = components.filter((component) => {
-          const boxWidth = component.maxX - component.minX + 1
-          const boxHeight = component.maxY - component.minY + 1
-          return component.count > width * height * 0.0025 && boxWidth > width * 0.06 && boxHeight > height * 0.06
-        })
-        const seed = (main.length ? main : fallback).slice(0, 4)
+        const sorted = candidates.sort((a, b) => b.count - a.count)
+        const merged: AngleComponent[] = []
+        for (const component of sorted) {
+          const isTinyDetail = componentAreaRatio(component) < 0.006 && boxAreaRatio(component) < 0.035
+          let mergedIntoExisting = false
+          for (let index = 0; index < merged.length; index += 1) {
+            const existing = merged[index]
+            const overlap = boxOverlapRatio(expandBox(component, 0.35), expandBox(existing, 0.35))
+            const close = boxCenterDistance(component, existing) < 0.22
+            if (overlap > 0.08 || close || isTinyDetail) {
+              merged[index] = unionBox(existing, component)
+              mergedIntoExisting = true
+              break
+            }
+          }
+          if (!mergedIntoExisting && !isTinyDetail) merged.push(component)
+        }
+        const split = merged.flatMap(splitOverlappedDoubleShoe)
+        const supplemented = absorbShoeDetailsIntoMainShoes(dedupeShoes([...split, ...inferWornShoeSupplements(components, split)]))
+        const connected = supplemented.filter((component) => connectedToAny(component, blueComponents, 0.1))
+        const disconnected = supplemented.filter((component) => !connectedToAny(component, blueComponents, 0.1))
+        const chosen = [...connected, ...disconnected]
+          .filter((component) => componentAreaRatio(component) > 0.007 || boxAreaRatio(component) > 0.04)
+          .slice(0, 4)
+        const seed = chosen.length ? chosen : supplemented.slice(0, 4)
         return seed.sort((a, b) => {
           const ay = (a.minY + a.maxY) / 2
           const by = (b.minY + b.maxY) / 2
@@ -2374,9 +2472,623 @@ function App() {
         const centerY = Math.round((((component.minY + component.maxY) / 2) / height) * 100)
         return { left, top, boxWidth, boxHeight, centerX, centerY }
       }
+      const pointLabel = (x: number, y: number) => {
+        const horizontal = x < 34 ? 'left' : x > 66 ? 'right' : 'center'
+        const vertical = y < 34 ? 'upper' : y > 66 ? 'lower' : 'middle'
+        return `${vertical}-${horizontal}`
+      }
+      const directionFromDelta = (dx: number, dy: number) => {
+        const horizontal = dx < -8 ? 'left' : dx > 8 ? 'right' : ''
+        const vertical = dy < -8 ? 'upper' : dy > 8 ? 'lower' : ''
+        if (vertical && horizontal) return `${vertical}-${horizontal}`
+        return vertical || horizontal || 'center'
+      }
+      const weightedCenter = (components: AngleComponent[]) => {
+        const weighted = components.reduce((acc, component) => {
+          const box = metrics(component)
+          const weight = Math.max(1, component.count)
+          return {
+            x: acc.x + box.centerX * weight,
+            y: acc.y + box.centerY * weight,
+            weight: acc.weight + weight,
+          }
+        }, { x: 0, y: 0, weight: 0 })
+        return weighted.weight ? { x: Math.round(weighted.x / weighted.weight), y: Math.round(weighted.y / weighted.weight) } : null
+      }
+      const axisForComponent = (mask: Uint8Array, component: AngleComponent) => {
+        let count = 0
+        let sumX = 0
+        let sumY = 0
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!mask[index]) continue
+            count += 1
+            sumX += x
+            sumY += y
+          }
+        }
+        if (!count) return null
+        const meanX = sumX / count
+        const meanY = sumY / count
+        let covXX = 0
+        let covXY = 0
+        let covYY = 0
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!mask[index]) continue
+            const dx = x - meanX
+            const dy = y - meanY
+            covXX += dx * dx
+            covXY += dx * dy
+            covYY += dy * dy
+          }
+        }
+        const angle = 0.5 * Math.atan2(2 * covXY, covXX - covYY)
+        const vx = Math.cos(angle)
+        const vy = Math.sin(angle)
+        let minProjection = Number.POSITIVE_INFINITY
+        let maxProjection = Number.NEGATIVE_INFINITY
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!mask[index]) continue
+            const projection = (x - meanX) * vx + (y - meanY) * vy
+            minProjection = Math.min(minProjection, projection)
+            maxProjection = Math.max(maxProjection, projection)
+          }
+        }
+        const start = {
+          x: Math.round(((meanX + vx * minProjection) / width) * 100),
+          y: Math.round(((meanY + vy * minProjection) / height) * 100),
+        }
+        const end = {
+          x: Math.round(((meanX + vx * maxProjection) / width) * 100),
+          y: Math.round(((meanY + vy * maxProjection) / height) * 100),
+        }
+        return {
+          start,
+          end,
+          angleDegrees: Math.round((angle * 180) / Math.PI),
+          direction: directionFromDelta(end.x - start.x, end.y - start.y),
+        }
+      }
       const touchesAny = (component: AngleComponent, others: AngleComponent[], ratio = 0.1) => {
         const expanded = expandBox(component, ratio)
         return others.some((other) => boxesOverlap(expanded, expandBox(other, ratio)))
+      }
+      type BlueRegionKind = 'leg-foot' | 'hand' | 'detail'
+      type BlueRegionAnalysis = {
+        component: AngleComponent
+        kind: BlueRegionKind
+        confidence: 'high' | 'medium' | 'low'
+        reason: string
+        connectedShoeIndexes: number[]
+        handScore: number
+        footScore: number
+        depthRole: string
+        debug: string
+      }
+      const componentSizeLabel = (box: ReturnType<typeof metrics>) => {
+        if (box.boxWidth >= 34 || box.boxHeight >= 34) return 'large'
+        if (box.boxWidth >= 17 || box.boxHeight >= 17) return 'medium'
+        return 'small'
+      }
+      const projectionGroups = (mask: Uint8Array, component: AngleComponent, axis: 'x' | 'y') => {
+        const boxWidth = component.maxX - component.minX + 1
+        const boxHeight = component.maxY - component.minY + 1
+        const length = axis === 'x' ? boxWidth : boxHeight
+        const cross = axis === 'x' ? boxHeight : boxWidth
+        const values = new Array(length).fill(0)
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!mask[index]) continue
+            values[axis === 'x' ? x - component.minX : y - component.minY] += 1
+          }
+        }
+        const maxValue = Math.max(...values, 1)
+        const threshold = Math.max(2, Math.min(cross * 0.18, maxValue * 0.32))
+        let groups = 0
+        let inGroup = false
+        let activeLength = 0
+        for (const value of values) {
+          const active = value >= threshold
+          if (active) {
+            activeLength += 1
+            if (!inGroup) {
+              groups += 1
+              inGroup = true
+            }
+          } else {
+            inGroup = false
+          }
+        }
+        return { groups, activeRatio: activeLength / Math.max(1, length) }
+      }
+      const componentInsideBoxRatio = (mask: Uint8Array, component: AngleComponent, box: ReturnType<typeof metrics>) => {
+        const left = Math.round((box.left / 100) * width)
+        const right = Math.round(((box.left + box.boxWidth) / 100) * width)
+        const top = Math.round((box.top / 100) * height)
+        const bottom = Math.round(((box.top + box.boxHeight) / 100) * height)
+        let activePixels = 0
+        let insidePixels = 0
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!mask[index]) continue
+            activePixels += 1
+            if (x >= left && x <= right && y >= top && y <= bottom) insidePixels += 1
+          }
+        }
+        return activePixels ? insidePixels / activePixels : 0
+      }
+      const terminalShapeStats = (mask: Uint8Array, component: AngleComponent, axis: ReturnType<typeof axisForComponent>, terminal: 'start' | 'end') => {
+        if (!axis) return { groups: 0, fillRatio: 1, areaRatio: 0, boxWidth: 0, boxHeight: 0 }
+        const start = { x: (axis.start.x / 100) * width, y: (axis.start.y / 100) * height }
+        const end = { x: (axis.end.x / 100) * width, y: (axis.end.y / 100) * height }
+        const dx = end.x - start.x
+        const dy = end.y - start.y
+        const length = Math.max(1, Math.hypot(dx, dy))
+        const vx = dx / length
+        const vy = dy / length
+        const px = -vy
+        const py = vx
+        const terminalLimit = length * 0.36
+        let count = 0
+        let minX = width
+        let minY = height
+        let maxX = 0
+        let maxY = 0
+        const qs: number[] = []
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!mask[index]) continue
+            const projection = (x - start.x) * vx + (y - start.y) * vy
+            const inTerminal = terminal === 'start' ? projection <= terminalLimit : projection >= length - terminalLimit
+            if (!inTerminal) continue
+            count += 1
+            minX = Math.min(minX, x)
+            minY = Math.min(minY, y)
+            maxX = Math.max(maxX, x)
+            maxY = Math.max(maxY, y)
+            qs.push((x - start.x) * px + (y - start.y) * py)
+          }
+        }
+        if (!count || !qs.length) return { groups: 0, fillRatio: 1, areaRatio: 0, boxWidth: 0, boxHeight: 0 }
+        const qMin = Math.min(...qs)
+        const qMax = Math.max(...qs)
+        const binCount = Math.max(12, Math.min(36, Math.round((qMax - qMin) / Math.max(2, Math.max(width, height) * 0.006))))
+        const bins = new Array(binCount).fill(0)
+        for (const q of qs) {
+          const index = Math.max(0, Math.min(binCount - 1, Math.floor(((q - qMin) / Math.max(1, qMax - qMin)) * binCount)))
+          bins[index] += 1
+        }
+        const maxBin = Math.max(...bins, 1)
+        const threshold = Math.max(2, maxBin * 0.28)
+        let groups = 0
+        let inGroup = false
+        for (const value of bins) {
+          if (value >= threshold) {
+            if (!inGroup) {
+              groups += 1
+              inGroup = true
+            }
+          } else {
+            inGroup = false
+          }
+        }
+        const boxWidthPx = maxX - minX + 1
+        const boxHeightPx = maxY - minY + 1
+        return {
+          groups,
+          fillRatio: count / Math.max(1, boxWidthPx * boxHeightPx),
+          areaRatio: count / Math.max(1, component.count),
+          boxWidth: Math.round((boxWidthPx / width) * 100),
+          boxHeight: Math.round((boxHeightPx / height) * 100),
+        }
+      }
+      const pointBoxDistance = (point: { x: number; y: number }, box: ReturnType<typeof metrics>) => {
+        const left = box.left
+        const right = box.left + box.boxWidth
+        const top = box.top
+        const bottom = box.top + box.boxHeight
+        const dx = point.x < left ? left - point.x : point.x > right ? point.x - right : 0
+        const dy = point.y < top ? top - point.y : point.y > bottom ? point.y - bottom : 0
+        return Math.hypot(dx, dy)
+      }
+      const componentPixelContact = (aMask: Uint8Array, a: AngleComponent, bMask: Uint8Array, b: AngleComponent) => {
+        const radius = Math.max(2, Math.round(Math.max(width, height) * 0.008))
+        let activePixels = 0
+        let contactPixels = 0
+        const minX = Math.max(0, b.minX - radius)
+        const minY = Math.max(0, b.minY - radius)
+        const maxX = Math.min(width - 1, b.maxX + radius)
+        const maxY = Math.min(height - 1, b.maxY + radius)
+        for (let y = a.minY; y <= a.maxY; y += 1) {
+          for (let x = a.minX; x <= a.maxX; x += 1) {
+            const index = y * width + x
+            if (!aMask[index]) continue
+            activePixels += 1
+            if (x < minX || x > maxX || y < minY || y > maxY) continue
+            let hasContact = false
+            for (let dy = -radius; dy <= radius && !hasContact; dy += 1) {
+              const ny = y + dy
+              if (ny < b.minY || ny > b.maxY) continue
+              for (let dx = -radius; dx <= radius; dx += 1) {
+                const nx = x + dx
+                if (nx < b.minX || nx > b.maxX) continue
+                if (dx * dx + dy * dy > radius * radius) continue
+                if (bMask[ny * width + nx]) {
+                  hasContact = true
+                  break
+                }
+              }
+            }
+            if (hasContact) contactPixels += 1
+          }
+        }
+        return {
+          contactPixels,
+          ratio: activePixels ? contactPixels / activePixels : 0,
+        }
+      }
+      const shoeLimbRelation = (limb: AngleComponent, shoe: AngleComponent) => {
+        const limbBox = metrics(limb)
+        const shoeBox = metrics(shoe)
+        const axis = axisForComponent(masks.blue, limb)
+        const contact = componentPixelContact(masks.blue, limb, masks.yellow, shoe)
+        const endpointDistances = axis
+          ? [pointBoxDistance(axis.start, shoeBox), pointBoxDistance(axis.end, shoeBox)]
+          : [100, 100]
+        const nearestEndpointDistance = Math.min(...endpointDistances)
+        const centerDistance = boxCenterDistance(limb, shoe)
+        const broadBoxOverlap = boxOverlapRatio(expandBox(limb, 0.04), expandBox(shoe, 0.04))
+        const endpointClose = nearestEndpointDistance <= 7
+        const realPixelContact = contact.contactPixels >= 10 && contact.ratio >= 0.0035
+        const likelyOnlyBoxOverlap =
+          broadBoxOverlap > 0.02 &&
+          !realPixelContact &&
+          !endpointClose
+        const connected =
+          !likelyOnlyBoxOverlap &&
+          (
+            (realPixelContact && centerDistance < 0.24) ||
+            (endpointClose && centerDistance < 0.22) ||
+            (realPixelContact && endpointClose)
+          )
+        return {
+          connected,
+          contactRatio: contact.ratio,
+          contactPixels: contact.contactPixels,
+          nearestEndpointDistance,
+          centerDistance,
+          broadBoxOverlap,
+          likelyOnlyBoxOverlap,
+          limbBox,
+          shoeBox,
+        }
+      }
+      type ShoeFirstBinding = {
+        shoeIndex: number
+        limbIndex: number
+        relation: ReturnType<typeof shoeLimbRelation>
+        insideRatio: number
+        touchesClothing: boolean
+        limbBox: ReturnType<typeof metrics>
+        shoeBox: ReturnType<typeof metrics>
+        role: 'worn' | 'hand-supported' | 'display'
+        strength: number
+        reason: string
+      }
+      const computeShoeFirstBindings = (components: AngleComponent[], shoes: AngleComponent[], clothes: AngleComponent[]) => {
+        return shoes.map((shoe, shoeIndex): ShoeFirstBinding | null => {
+          const shoeBox = metrics(shoe)
+          const candidates = components.map((limb, limbIndex) => {
+            const relation = shoeLimbRelation(limb, shoe)
+            const limbBox = metrics(limb)
+            const insideRatio = componentInsideBoxRatio(masks.blue, limb, shoeBox)
+            const touchesClothing = touchesAny(limb, clothes, 0.12)
+            const axis = axisForComponent(masks.blue, limb)
+            const endpointLock = relation.nearestEndpointDistance <= 7
+            const realContact = relation.contactPixels >= 20 || relation.contactRatio >= 0.004
+            const softContact = relation.contactPixels >= 8 || relation.contactRatio >= 0.0025
+            const wornHardEvidence =
+              realContact ||
+              insideRatio >= 0.08 ||
+              (endpointLock && insideRatio > 0.02)
+            const broadLimb = componentAreaRatio(limb) > 0.018 || limbBox.boxWidth > 24 || limbBox.boxHeight > 28
+            const strength =
+              (realContact ? 8 : 0) +
+              (softContact && !realContact ? 3 : 0) +
+              (endpointLock && wornHardEvidence ? 6 : endpointLock ? 2 : 0) +
+              (insideRatio >= 0.18 ? 5 : insideRatio >= 0.08 ? 2 : 0) +
+              (touchesClothing && wornHardEvidence ? 3 : touchesClothing ? 1 : 0) +
+              (broadLimb ? 2 : 0) -
+              (relation.likelyOnlyBoxOverlap ? 8 : 0)
+            const handLikeOutside =
+              relation.connected &&
+              !touchesClothing &&
+              insideRatio < 0.08 &&
+              componentSizeLabel(limbBox) !== 'large' &&
+              limbBox.centerY < shoeBox.centerY + shoeBox.boxHeight * 0.2
+            return {
+              shoeIndex,
+              limbIndex,
+              relation,
+              insideRatio,
+              touchesClothing,
+              limbBox,
+              shoeBox,
+              axis,
+              wornHardEvidence,
+              softContact,
+              strength,
+              handLikeOutside,
+            }
+          }).sort((a, b) => b.strength - a.strength)
+          const best = candidates[0]
+          if (!best || best.strength < 5 || best.relation.likelyOnlyBoxOverlap) {
+            return null
+          }
+          const handSupportEvidence =
+            best.handLikeOutside &&
+            (best.softContact || best.relation.nearestEndpointDistance <= 10) &&
+            best.insideRatio < 0.08
+          if (!best.wornHardEvidence && !handSupportEvidence) {
+            return null
+          }
+          const role: ShoeFirstBinding['role'] =
+            handSupportEvidence && !best.wornHardEvidence
+              ? 'hand-supported'
+              : best.handLikeOutside && best.insideRatio < 0.04
+                ? 'hand-supported'
+                : 'worn'
+          return {
+            shoeIndex,
+            limbIndex: best.limbIndex,
+            relation: best.relation,
+            insideRatio: best.insideRatio,
+            touchesClothing: best.touchesClothing,
+            limbBox: best.limbBox,
+            shoeBox: best.shoeBox,
+            role,
+            strength: best.strength,
+            reason: `shoe-first ${role}: pixelContact=${best.relation.contactPixels}, endpointDist=${Math.round(best.relation.nearestEndpointDistance)}, inside=${best.insideRatio.toFixed(2)}, red=${best.touchesClothing ? 'yes' : 'no'}, hardWorn=${best.wornHardEvidence ? 'yes' : 'no'}, handSupport=${handSupportEvidence ? 'yes' : 'no'}, boxOnly=${best.relation.likelyOnlyBoxOverlap ? 'yes' : 'no'}, strength=${best.strength}`,
+          }
+        })
+      }
+      const classifyBlueRegions = (components: AngleComponent[], shoes: AngleComponent[], clothes: AngleComponent[], shoeFirstBindings: Array<ShoeFirstBinding | null>): BlueRegionAnalysis[] => {
+        const largestBlueArea = Math.max(...components.map((component) => componentAreaRatio(component)), 0)
+        return components.map((component, componentIndex) => {
+          const box = metrics(component)
+          const bboxArea = Math.max(1, (component.maxX - component.minX + 1) * (component.maxY - component.minY + 1))
+          const fillRatio = component.count / bboxArea
+          const areaRatio = componentAreaRatio(component)
+          const axis = axisForComponent(masks.blue, component)
+          const connectedShoeIndexes = shoes
+            .map((shoe, index) => ({ shoe, index }))
+            .filter(({ shoe }) => shoeLimbRelation(component, shoe).connected)
+            .map(({ index }) => index)
+          const componentBindings: ShoeFirstBinding[] = []
+          for (const binding of shoeFirstBindings) {
+            if (binding && binding.limbIndex === componentIndex) componentBindings.push(binding)
+          }
+          const boundAsWornShoes = componentBindings
+            .filter((binding) => binding.role === 'worn')
+            .map((binding) => binding.shoeIndex)
+          const boundAsHandShoes = componentBindings
+            .filter((binding) => binding.role === 'hand-supported')
+            .map((binding) => binding.shoeIndex)
+          const touchesClothing = touchesAny(component, clothes, 0.1)
+          const touchesFrameEdge = box.left < 4 || box.top < 4 || box.left + box.boxWidth > 96 || box.top + box.boxHeight > 96
+          const xProjection = projectionGroups(masks.blue, component, 'x')
+          const yProjection = projectionGroups(masks.blue, component, 'y')
+          const fingerLikeBranches = Math.max(xProjection.groups, yProjection.groups)
+          const slender = Math.max(box.boxWidth, box.boxHeight) / Math.max(1, Math.min(box.boxWidth, box.boxHeight))
+          const largeContinuousLimb = areaRatio > 0.022 || box.boxWidth > 24 || box.boxHeight > 28
+          const smallComparedToLargest = largestBlueArea > 0 && areaRatio < largestBlueArea * 0.48
+          const compactHandScale = componentSizeLabel(box) !== 'large' || (smallComparedToLargest && box.boxWidth < 26 && box.boxHeight < 28)
+          const hasShoeRelationship = connectedShoeIndexes.length > 0
+          const shoeBoxes = connectedShoeIndexes.map((index) => metrics(shoes[index]))
+          const touchesShoeFromUpperSide = shoeBoxes.some((shoeBox) => box.centerY < shoeBox.centerY - 5 || box.top < shoeBox.top + shoeBox.boxHeight * 0.36)
+          const shoeContainsLimbEndpoint = Boolean(axis && shoeBoxes.some((shoeBox) => {
+            return pointBoxDistance(axis.start, shoeBox) <= 7 || pointBoxDistance(axis.end, shoeBox) <= 7
+          }))
+          const startTerminal = terminalShapeStats(masks.blue, component, axis, 'start')
+          const endTerminal = terminalShapeStats(masks.blue, component, axis, 'end')
+          const shoeNearStart = Boolean(axis && shoeBoxes.some((shoeBox) => pointBoxDistance(axis.start, shoeBox) <= 9))
+          const shoeNearEnd = Boolean(axis && shoeBoxes.some((shoeBox) => pointBoxDistance(axis.end, shoeBox) <= 9))
+          const shoeTerminal = shoeNearStart ? startTerminal : shoeNearEnd ? endTerminal : endTerminal.areaRatio >= startTerminal.areaRatio ? endTerminal : startTerminal
+          const insideAnyShoeRatio = shoeBoxes.reduce((maxRatio, shoeBox) => Math.max(maxRatio, componentInsideBoxRatio(masks.blue, component, shoeBox)), 0)
+          const ankleContourLike =
+            hasShoeRelationship &&
+            (shoeContainsLimbEndpoint || insideAnyShoeRatio >= 0.18) &&
+            largeContinuousLimb &&
+            slender >= 1.35 &&
+            shoeTerminal.groups <= 2 &&
+            shoeTerminal.fillRatio >= 0.34 &&
+            (shoeTerminal.boxWidth >= 7 || shoeTerminal.boxHeight >= 7)
+          const shoeFirstWornLock = boundAsWornShoes.length > 0
+          const shoeFirstHandLock = boundAsHandShoes.length > 0 && !shoeFirstWornLock
+          const fingerTerminalLike =
+            hasShoeRelationship &&
+            shoeTerminal.groups >= 2 &&
+            shoeTerminal.fillRatio < 0.56 &&
+            shoeTerminal.areaRatio < 0.45 &&
+            (componentSizeLabel(box) !== 'large' || smallComparedToLargest)
+          const fingerContourLike =
+            fingerLikeBranches >= 3 ||
+            (fingerLikeBranches >= 2 && fillRatio < 0.6 && slender >= 1.2) ||
+            fingerTerminalLike
+          const footScore =
+            (hasShoeRelationship ? 3 : 0) +
+            (touchesClothing ? 2 : 0) +
+            (largeContinuousLimb ? 3 : 0) +
+            (shoeContainsLimbEndpoint ? 2 : 0) +
+            (insideAnyShoeRatio >= 0.18 ? 3 : 0) +
+            (ankleContourLike ? 8 : 0) +
+            (shoeFirstWornLock ? 12 : 0) +
+            (touchesFrameEdge && areaRatio > 0.012 ? 1 : 0) +
+            (box.centerY >= 45 ? 1 : 0)
+          const handScore =
+            (hasShoeRelationship ? 2 : 0) +
+            (compactHandScale ? 2 : 0) +
+            (fingerLikeBranches >= 3 ? 4 : fingerLikeBranches >= 2 ? 2 : 0) +
+            (touchesShoeFromUpperSide ? 2 : 0) +
+            (fingerContourLike ? 4 : 0) +
+            (fingerTerminalLike ? 4 : 0) +
+            (shoeFirstHandLock ? 8 : 0) +
+            (smallComparedToLargest ? 1 : 0) +
+            (!shoeContainsLimbEndpoint ? 1 : 0)
+          const bindingDebug = componentBindings
+            .map((binding) => `S${binding.shoeIndex + 1}:${binding.reason}`)
+            .join(' | ') || 'none'
+          const depthRole = hasShoeRelationship
+            ? touchesShoeFromUpperSide && handScore > footScore
+              ? 'foreground hand/support layer touching shoe'
+              : shoeContainsLimbEndpoint || footScore >= handScore
+                ? 'body limb under/inside worn shoe layer'
+                : 'ambiguous support layer near shoe'
+            : touchesClothing
+              ? 'body limb connected under clothing layer'
+              : 'isolated minor detail layer'
+          const handLike =
+            hasShoeRelationship &&
+            !shoeFirstWornLock &&
+            !ankleContourLike &&
+            (compactHandScale || fingerContourLike) &&
+            (
+              fingerTerminalLike ||
+              fingerContourLike ||
+              (fingerLikeBranches >= 3 && fillRatio < 0.62 && areaRatio < 0.08) ||
+              (fingerLikeBranches >= 2 && slender > 1.25 && fillRatio < 0.66 && touchesShoeFromUpperSide) ||
+              (touchesClothing && smallComparedToLargest && touchesShoeFromUpperSide && !shoeContainsLimbEndpoint)
+            )
+          const legFootLike =
+            shoeFirstWornLock ||
+            ankleContourLike ||
+            (touchesClothing && largeContinuousLimb && !handLike) ||
+            (
+              hasShoeRelationship &&
+              largeContinuousLimb &&
+              !handLike
+            ) ||
+            (
+              touchesFrameEdge &&
+              hasShoeRelationship &&
+              areaRatio > 0.012 &&
+              !handLike
+            )
+          if (areaRatio < 0.004 && !hasShoeRelationship && !touchesClothing) {
+            return {
+              component,
+              kind: 'detail',
+              confidence: 'medium',
+              connectedShoeIndexes,
+              handScore,
+              footScore,
+              depthRole,
+              debug: `shoeFirst=${bindingDebug}`,
+              reason: 'small isolated blue fragment; merge into nearest body detail and do not generate a separate limb',
+            }
+          }
+          if (handLike) {
+            return {
+              component,
+              kind: 'hand',
+              confidence: fingerLikeBranches >= 3 ? 'high' : 'medium',
+              connectedShoeIndexes,
+              handScore,
+              footScore,
+              depthRole,
+              debug: `shoeFirst=${bindingDebug}`,
+              reason: `hand/wrist candidate wins: handScore ${handScore}, footScore ${footScore}, compact ${componentSizeLabel(box)} blue shape, finger-like branch count ${fingerLikeBranches}, terminal finger groups ${shoeTerminal.groups}, fill ${fillRatio.toFixed(2)}, near shoe S${connectedShoeIndexes.map((index) => index + 1).join('/S')}; generate as hand holding/supporting shoe, not as a leg`,
+            }
+          }
+          if (legFootLike) {
+            return {
+              component,
+              kind: 'leg-foot',
+              confidence: touchesClothing || largeContinuousLimb ? 'high' : 'medium',
+              connectedShoeIndexes,
+              handScore,
+              footScore,
+              depthRole,
+              debug: `shoeFirst=${bindingDebug}`,
+              reason: `leg/foot/ankle candidate wins: handScore ${handScore}, footScore ${footScore}; ${touchesClothing ? 'connected to clothing, ' : ''}${hasShoeRelationship ? 'connected to shoe placement, ' : ''}${ankleContourLike ? 'ankle/instep continuous contour, ' : ''}large continuous limb ${largeContinuousLimb ? 'yes' : 'no'}; generate as visible leg/foot structure`,
+            }
+          }
+          return {
+            component,
+            kind: hasShoeRelationship ? 'hand' : 'detail',
+            confidence: 'low',
+            connectedShoeIndexes,
+            handScore,
+            footScore,
+            depthRole,
+            debug: `shoeFirst=${bindingDebug}`,
+            reason: hasShoeRelationship
+              ? `ambiguous blue region near a shoe but not clothing; handScore ${handScore}, footScore ${footScore}; treat conservatively as hand/support detail, not an extra leg`
+              : `ambiguous blue region; handScore ${handScore}, footScore ${footScore}; keep as minor body detail and do not create an extra leg`,
+          }
+        })
+      }
+      const splitMergedShoeByBlueFootAnchors = (component: AngleComponent) => {
+        const footAnchors = blueComponents
+          .map((limb) => {
+            const contact = componentPixelContact(masks.blue, limb, masks.yellow, component)
+            const overlap = boxOverlapRatio(expandBox(limb, 0.05), expandBox(component, 0.04))
+            const limbBox = metrics(limb)
+            const shoeBox = metrics(component)
+            const limbArea = componentAreaRatio(limb)
+            const lowerLimbNearShoe = limbBox.centerY < shoeBox.centerY + shoeBox.boxHeight * 0.45 && limbBox.centerY > shoeBox.top - 28
+            const largeFootAnchor = limbArea > 0.012 || limbBox.boxWidth > 18 || limbBox.boxHeight > 18
+            return { limb, contact, overlap, limbBox, lowerLimbNearShoe, largeFootAnchor }
+          })
+          .filter(({ contact, overlap, lowerLimbNearShoe, largeFootAnchor }) =>
+            lowerLimbNearShoe &&
+            largeFootAnchor &&
+            (contact.contactPixels >= 8 || contact.ratio >= 0.0025 || overlap > 0.025),
+          )
+          .sort((a, b) => a.limbBox.centerX - b.limbBox.centerX)
+        if (footAnchors.length < 2) return [component]
+
+        const boxWidth = component.maxX - component.minX + 1
+        const boxHeight = component.maxY - component.minY + 1
+        const wideEnoughForPair = boxWidth > width * 0.26 && boxHeight > height * 0.08
+        const anchorSpread = footAnchors[footAnchors.length - 1].limbBox.centerX - footAnchors[0].limbBox.centerX
+        const anchorYSpread = Math.abs(footAnchors[footAnchors.length - 1].limbBox.centerY - footAnchors[0].limbBox.centerY)
+        if (!wideEnoughForPair || anchorSpread < 24 || anchorYSpread < 8) return [component]
+
+        const splitXs = footAnchors.slice(0, -1).map((anchor, index) => {
+          const next = footAnchors[index + 1]
+          return Math.round(((anchor.limbBox.centerX + next.limbBox.centerX) / 2 / 100) * width)
+        })
+        const parts = footAnchors.map((_, anchorIndex) => {
+          const leftLimit = anchorIndex === 0 ? component.minX : Math.max(component.minX, splitXs[anchorIndex - 1] + 1)
+          const rightLimit = anchorIndex === splitXs.length ? component.maxX : Math.min(component.maxX, splitXs[anchorIndex])
+          let minX = width
+          let minY = height
+          let maxX = 0
+          let maxY = 0
+          let count = 0
+          for (let y = component.minY; y <= component.maxY; y += 1) {
+            for (let x = leftLimit; x <= rightLimit; x += 1) {
+              const index = y * width + x
+              if (!masks.yellow[index]) continue
+              minX = Math.min(minX, x)
+              minY = Math.min(minY, y)
+              maxX = Math.max(maxX, x)
+              maxY = Math.max(maxY, y)
+              count += 1
+            }
+          }
+          return count > width * height * 0.0025 ? { minX, minY, maxX, maxY, count } : null
+        }).filter(Boolean) as AngleComponent[]
+        return parts.length >= 2 ? parts : [component]
       }
       const drawCoordinateGrid = (ctx: CanvasRenderingContext2D) => {
         ctx.save()
@@ -2404,55 +3116,41 @@ function App() {
         const shoeBoxes = shoes.map(metrics)
         const limbBoxes = limbs.map(metrics)
         const clothingBoxes = clothes.map(metrics)
-        const weightedCenter = (boxes: ReturnType<typeof metrics>[]) => {
-          const weighted = boxes.reduce((acc, box) => {
-            const weight = Math.max(1, box.boxWidth * box.boxHeight)
-            return {
-              x: acc.x + box.centerX * weight,
-              y: acc.y + box.centerY * weight,
-              weight: acc.weight + weight,
-            }
-          }, { x: 0, y: 0, weight: 0 })
-          return weighted.weight ? { x: Math.round(weighted.x / weighted.weight), y: Math.round(weighted.y / weighted.weight) } : null
-        }
-        const bodyBoxes = [...limbBoxes, ...clothingBoxes]
-        const bodyOrigin = weightedCenter(bodyBoxes.length ? bodyBoxes : limbBoxes)
-        const shoeTarget = weightedCenter(shoeBoxes)
-        const edgeLabel = (point: { x: number; y: number } | null) => {
-          if (!point) return 'unknown'
-          const horizontal = point.x < 34 ? 'left' : point.x > 66 ? 'right' : 'center'
-          const vertical = point.y < 34 ? 'upper' : point.y > 66 ? 'lower' : 'middle'
-          return `${vertical}-${horizontal}`
-        }
-        const directionFromDelta = (dx: number, dy: number) => {
-          const horizontal = dx < -8 ? 'left' : dx > 8 ? 'right' : ''
-          const vertical = dy < -8 ? 'upper' : dy > 8 ? 'lower' : ''
-          if (vertical && horizontal) return `${vertical}-${horizontal}`
-          return vertical || horizontal || 'center'
-        }
+        const bodyOrigin = weightedCenter(clothes.length ? clothes : [...limbs, ...clothes])
+        const limbTarget = weightedCenter(limbs)
+        const shoeTarget = weightedCenter(shoes)
         const dx = bodyOrigin && shoeTarget ? shoeTarget.x - bodyOrigin.x : 0
         const dy = bodyOrigin && shoeTarget ? shoeTarget.y - bodyOrigin.y : 0
         const extensionDirection = directionFromDelta(dx, dy)
-        const bodyOriginLabel = edgeLabel(bodyOrigin)
-        const shoeTargetLabel = edgeLabel(shoeTarget)
+        const bodyOriginLabel = bodyOrigin ? pointLabel(bodyOrigin.x, bodyOrigin.y) : 'unknown'
+        const limbTargetLabel = limbTarget ? pointLabel(limbTarget.x, limbTarget.y) : 'unknown'
+        const shoeTargetLabel = shoeTarget ? pointLabel(shoeTarget.x, shoeTarget.y) : 'unknown'
         const vectorLength = Math.round(Math.sqrt(dx * dx + dy * dy))
         const largeShoePresence = shoeBoxes.some((box) => box.boxWidth >= 18 || box.boxHeight >= 18)
-        const bodyAtFrameEdge = bodyBoxes.some((box) => box.left < 8 || box.top < 8 || box.left + box.boxWidth > 92 || box.top + box.boxHeight > 92)
+        const bodyAtFrameEdge = [...limbBoxes, ...clothingBoxes].some((box) => box.left < 8 || box.top < 8 || box.left + box.boxWidth > 92 || box.top + box.boxHeight > 92)
         const diagonalPose = Math.abs(dx) >= 10 && Math.abs(dy) >= 8
         const verticalStanding = Math.abs(dx) < 14 && dy > 12
-        const cameraLabel = largeShoePresence && (diagonalPose || bodyAtFrameEdge)
-          ? 'downward oblique / high-angle coordinate view'
+        const bodyToShoesFromEdge = bodyOrigin && shoeTarget && bodyOrigin.x > 58 && bodyOrigin.y > 38 && shoeTarget.x < bodyOrigin.x - 10
+        const edgeBodyToLeftShoes = bodyOrigin && shoeTarget && bodyOrigin.x > 70 && shoeTarget.x < bodyOrigin.x - 18
+        const strongDownwardPose = largeShoePresence && (diagonalPose || bodyAtFrameEdge || bodyToShoesFromEdge || edgeBodyToLeftShoes)
+        const cameraLabel = strongDownwardPose
+          ? 'top-down / downward high-angle view, like looking down at legs and shoes'
           : verticalStanding
             ? 'standing lower-body front or three-quarter coordinate view'
             : 'coordinate-preserved angle-reference view'
         const instruction = [
-          `Coordinate inference by code: body origin is ${bodyOriginLabel}${bodyOrigin ? ` at (${bodyOrigin.x}%, ${bodyOrigin.y}%)` : ''}; shoe target is ${shoeTargetLabel}${shoeTarget ? ` at (${shoeTarget.x}%, ${shoeTarget.y}%)` : ''}; extension vector from body to shoes is dx=${dx}, dy=${dy}, direction=${extensionDirection}, length=${vectorLength}.`,
+          `Coordinate inference by code: body/clothing origin is ${bodyOriginLabel}${bodyOrigin ? ` at (${bodyOrigin.x}%, ${bodyOrigin.y}%)` : ''}; limb center is ${limbTargetLabel}${limbTarget ? ` at (${limbTarget.x}%, ${limbTarget.y}%)` : ''}; shoe target is ${shoeTargetLabel}${shoeTarget ? ` at (${shoeTarget.x}%, ${shoeTarget.y}%)` : ''}; extension vector from body to shoes is dx=${dx}, dy=${dy}, direction=${extensionDirection}, length=${vectorLength}.`,
           `Camera inference by code: ${cameraLabel}. Preserve this computed body-origin-to-shoe-target direction and camera relationship from the uploaded angle reference.`,
+          strongDownwardPose ? 'This must be treated as a downward-looking composition, not an eye-level standing product shot.' : '',
           `Generated body/clothing must stay near the computed body origin (${bodyOriginLabel}); generated legs/shoes must extend toward ${extensionDirection}; do not recenter, flip, rotate, straighten into a generic vertical standing pose, or replace with an eye-level view unless the computed direction is vertical standing.`,
         ].join(' ')
         return {
           label: `${cameraLabel}; body ${bodyOriginLabel} to shoes ${shoeTargetLabel}; direction ${extensionDirection}`,
           instruction,
+          bodyOrigin,
+          shoeTarget,
+          extensionDirection,
+          strongDownwardPose,
         }
       }
       const drawMaskOutline = (ctx: CanvasRenderingContext2D, mask: Uint8Array, components: AngleComponent[], strokeStyle: string, lineWidthRatio = 0.004) => {
@@ -2490,11 +3188,281 @@ function App() {
         }
         ctx.restore()
       }
+      const rawBlueComponents = mergeNearby(findComponents(masks.blue, 0.0012), 0.045).slice(0, 8)
+      let blueComponents = rawBlueComponents
+      const redComponents = mergeNearby(findComponents(masks.red, 0.002), 0.12).slice(0, 4)
+      const rawYellowComponents = findComponents(masks.yellow, 0.0012)
+      const yellowComponents = dedupeShoes(
+        mergeShoeFragments(rawYellowComponents).flatMap(splitMergedShoeByBlueFootAnchors),
+      ).slice(0, 6)
+      const splitCrossedBlueLegs = (component: AngleComponent): AngleComponent[] => {
+        const box = metrics(component)
+        const areaRatio = componentAreaRatio(component)
+        const nearbyShoes = yellowComponents
+          .map((shoe, index) => {
+            const shoeBox = metrics(shoe)
+            const relation = shoeLimbRelation(component, shoe)
+            const overlap = boxOverlapRatio(expandBox(component, 0.04), expandBox(shoe, 0.04))
+            return { shoe, index, shoeBox, relation, overlap }
+          })
+          .filter(({ relation, overlap }) => relation.connected || overlap > 0.02 || relation.nearestEndpointDistance <= 12)
+          .sort((a, b) => a.shoeBox.centerX - b.shoeBox.centerX)
+        const likelyCrossedLegMass =
+          nearbyShoes.length >= 2 &&
+          areaRatio > 0.025 &&
+          box.boxWidth >= 24 &&
+          box.boxHeight >= 30
+        if (!likelyCrossedLegMass) return [component]
 
-      const yellowComponents = mergeShoeFragments(findComponents(masks.yellow, 0.0012)).slice(0, 6)
-      const blueComponents = mergeNearby(findComponents(masks.blue, 0.0015)).slice(0, 6)
-      const redComponents = mergeNearby(findComponents(masks.red, 0.002)).slice(0, 4)
+        const anchors = nearbyShoes.slice(0, 3).map(({ shoeBox }) => ({ x: shoeBox.centerX, y: shoeBox.centerY }))
+        if (anchors.length < 2) return [component]
+        const assigned = anchors.map(() => ({
+          minX: width,
+          minY: height,
+          maxX: 0,
+          maxY: 0,
+          count: 0,
+        }))
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!masks.blue[index]) continue
+            const px = (x / width) * 100
+            const py = (y / height) * 100
+            let bestIndex = 0
+            let bestDistance = Number.POSITIVE_INFINITY
+            anchors.forEach((anchor, anchorIndex) => {
+              const distance = Math.hypot(px - anchor.x, py - anchor.y)
+              if (distance < bestDistance) {
+                bestDistance = distance
+                bestIndex = anchorIndex
+              }
+            })
+            const target = assigned[bestIndex]
+            target.minX = Math.min(target.minX, x)
+            target.minY = Math.min(target.minY, y)
+            target.maxX = Math.max(target.maxX, x)
+            target.maxY = Math.max(target.maxY, y)
+            target.count += 1
+          }
+        }
+        const minPartArea = width * height * 0.006
+        const parts = assigned
+          .filter((part) => part.count >= minPartArea)
+          .map((part) => ({ minX: part.minX, minY: part.minY, maxX: part.maxX, maxY: part.maxY, count: part.count }))
+        return parts.length >= 2 ? parts : [component]
+      }
+      blueComponents = rawBlueComponents.flatMap(splitCrossedBlueLegs).slice(0, 10)
+      const crossedLegSplitApplied = blueComponents.length > rawBlueComponents.length
       const cameraInference = inferCameraView(yellowComponents, blueComponents, redComponents)
+      const shoeFirstBindings = computeShoeFirstBindings(blueComponents, yellowComponents, redComponents)
+      const blueRegionAnalysis = classifyBlueRegions(blueComponents, yellowComponents, redComponents, shoeFirstBindings)
+      const legFootRegions = blueRegionAnalysis.filter((region) => region.kind === 'leg-foot')
+      const handRegions = blueRegionAnalysis.filter((region) => region.kind === 'hand')
+      const detailRegions = blueRegionAnalysis.filter((region) => region.kind === 'detail')
+      const shoeConnectedToKind = (shoeIndex: number, kind: BlueRegionKind) => blueRegionAnalysis.some((region) => region.kind === kind && region.connectedShoeIndexes.includes(shoeIndex))
+      const shoeHasStrongFootBinding = (shoeIndex: number) => {
+        const shoe = yellowComponents[shoeIndex]
+        if (!shoe) return false
+        const binding = shoeFirstBindings[shoeIndex]
+        if (binding?.role === 'worn') return true
+        return blueComponents.some((limb) => {
+          const relation = shoeLimbRelation(limb, shoe)
+          const limbAnalysis = blueRegionAnalysis.find((region) => region.component === limb)
+          return relation.connected &&
+            limbAnalysis?.kind === 'leg-foot' &&
+            (relation.nearestEndpointDistance <= 6 || relation.contactRatio >= 0.006)
+        })
+      }
+      const wornShoeIndexes = yellowComponents
+        .map((_, index) => index)
+        .filter((index) => shoeFirstBindings[index]?.role === 'worn' || (shoeConnectedToKind(index, 'leg-foot') && shoeHasStrongFootBinding(index)))
+      const handHeldShoeIndexes = yellowComponents
+        .map((_, index) => index)
+        .filter((index) => !wornShoeIndexes.includes(index) && (shoeFirstBindings[index]?.role === 'hand-supported' || shoeConnectedToKind(index, 'hand')))
+      const displayShoeIndexes = yellowComponents
+        .map((_, index) => index)
+        .filter((index) => !wornShoeIndexes.includes(index) && !handHeldShoeIndexes.includes(index))
+      const shoeInstanceCountFor = (shoeIndex: number) => {
+        const shoe = yellowComponents[shoeIndex]
+        const box = metrics(shoe)
+        const nestedRawParts = rawYellowComponents.filter((component) => {
+          if (componentAreaRatio(component) < 0.0022 && boxAreaRatio(component) < 0.018) return false
+          return boxOverlapRatio(expandBox(component, 0.025), expandBox(shoe, 0.015)) > 0.62 ||
+            boxesOverlap(expandBox(component, 0.04), expandBox(shoe, 0.01))
+        })
+        const separatedPartCount = absorbShoeDetailsIntoMainShoes(dedupeShoes(nestedRawParts))
+          .filter((component) => componentAreaRatio(component) > 0.004 || boxAreaRatio(component) > 0.026)
+          .length
+        const connectedLegs = blueRegionAnalysis.filter((region) => region.kind === 'leg-foot' && region.connectedShoeIndexes.includes(shoeIndex)).length
+        const largePairBox =
+          box.boxWidth >= 34 &&
+          box.boxHeight >= 24 &&
+          componentAreaRatio(shoe) > 0.025
+        const veryWideDisplay =
+          displayShoeIndexes.includes(shoeIndex) &&
+          box.boxWidth >= 30 &&
+          box.boxHeight >= 18
+        const wornPairBox =
+          wornShoeIndexes.includes(shoeIndex) &&
+          (connectedLegs >= 2 || (largePairBox && box.boxWidth >= 38 && box.boxHeight >= 32))
+        const inferred = Math.max(
+          1,
+          separatedPartCount >= 2 && (largePairBox || veryWideDisplay || wornPairBox) ? separatedPartCount : 1,
+          veryWideDisplay || wornPairBox ? 2 : 1,
+        )
+        return Math.min(2, inferred)
+      }
+      const shoeInstanceCounts = yellowComponents.map((_, index) => shoeInstanceCountFor(index))
+      const roleInstanceCount = (indexes: number[]) => indexes.reduce((sum, index) => sum + (shoeInstanceCounts[index] || 1), 0)
+      const mainShoeInstanceCount = shoeInstanceCounts.reduce((sum, count) => sum + count, 0)
+      const wornShoeInstanceCount = roleInstanceCount(wornShoeIndexes)
+      const handHeldShoeInstanceCount = roleInstanceCount(handHeldShoeIndexes)
+      const displayShoeInstanceCount = roleInstanceCount(displayShoeIndexes)
+      const shoeInstanceSuffix = (index: number) => {
+        const count = shoeInstanceCounts[index] || 1
+        return count > 1 ? ` x${count}` : ''
+      }
+      const shoeRoleList = (indexes: number[]) => indexes.length
+        ? indexes.map((index) => `S${index + 1}${shoeInstanceSuffix(index)}`).join(', ')
+        : 'none'
+      const layerOrder = [
+        redComponents.length ? 'Layer 1 clothing/red regions are the front garment or body-cover layer; they may cover blue limbs.' : '',
+        blueComponents.length ? 'Layer 2 blue regions are body/limb structure behind clothing and connected to shoes or hands; use skeleton/candidate scores to split hands from feet.' : '',
+        yellowComponents.length ? 'Layer 3 yellow S regions are shoe placement/angle objects over or around blue limbs; shoe appearance still comes only from product image.' : '',
+        'Layer 4 black/empty regions are background/environment only.',
+      ].filter(Boolean)
+      const depthLayerMap = [
+        'DEPTH LAYER MAP BY CODE:',
+        ...layerOrder,
+        'Depth rule: use this layer map only for occlusion, object order, and angle/depth interpretation. Do not use it for lighting, shadows, color, texture, or photographic style.',
+      ].join('\n')
+      const clothingRegionMap = [
+        'CLOTHING REGION MAP BY CODE:',
+        redComponents.length
+          ? `redClothingRegionCount = ${redComponents.length}`
+          : 'redClothingRegionCount = 0',
+        ...redComponents.map((component, index) => {
+          const box = metrics(component)
+          const axis = axisForComponent(masks.red, component)
+          const axisText = axis ? `axis (${axis.start.x}%,${axis.start.y}%) -> (${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'axis unknown'
+          const connectedBlue = blueRegionAnalysis
+            .map((region, regionIndex) => ({ region, regionIndex }))
+            .filter(({ region }) => touchesAny(component, [region.component], 0.08))
+            .map(({ regionIndex }) => `B${regionIndex + 1}`)
+          return `R${index + 1}: role=secondary-clothing-only, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), ${axisText}, connectedBody=${connectedBlue.length ? connectedBlue.join('/') : 'none'}`
+        }),
+        'Clothing rule: red regions are only lower-body outfit support from the model reference. They define clothing placement/crop/occlusion around legs and shoes, not upper-body framing. Keep clothing secondary and keep the camera focused on product shoes.',
+      ].join('\n')
+      const skeletonMap = [
+        'SKELETON MAP BY CODE:',
+        ...blueRegionAnalysis.map((region, index) => {
+          const box = metrics(region.component)
+          const axis = axisForComponent(masks.blue, region.component)
+          const axisText = axis ? `axis (${axis.start.x}%,${axis.start.y}%) -> (${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'axis unknown'
+          return `Skeleton B${index + 1}: role=${region.kind}, ${axisText}, center (${box.centerX}%,${box.centerY}%), depthRole=${region.depthRole}`
+        }),
+      ].join('\n')
+      const candidateMap = [
+        'HAND FOOT CANDIDATES BY CODE:',
+        ...blueRegionAnalysis.map((region, index) => {
+          const box = metrics(region.component)
+          return `Candidate B${index + 1}: final=${region.kind}, confidence=${region.confidence}, handScore=${region.handScore}, footScore=${region.footScore}, center (${box.centerX}%,${box.centerY}%), connectedShoes=${region.connectedShoeIndexes.length ? region.connectedShoeIndexes.map((shoeIndex) => `S${shoeIndex + 1}`).join('/') : 'none'}, debug=${region.debug}`
+        }),
+      ].join('\n')
+      const inferPoseType = () => {
+        const body = cameraInference.bodyOrigin
+        const shoe = cameraInference.shoeTarget
+        const hasHandheld = handHeldShoeIndexes.length > 0 || handRegions.length > 0
+        const bodyAtRightEdge = Boolean(body && body.x >= 74)
+        const bodyAtTop = Boolean(body && body.y <= 32)
+        const shoesLeftOfBody = Boolean(body && shoe && shoe.x < body.x - 14)
+        const singleWornWithDisplay = wornShoeIndexes.length === 1 && (displayShoeIndexes.length > 0 || handHeldShoeIndexes.length > 0)
+        if (bodyAtRightEdge && shoesLeftOfBody && !hasHandheld) return 'standing first-person downward POV'
+        if (bodyAtRightEdge && shoesLeftOfBody && singleWornWithDisplay) return 'standing first-person downward POV with one worn shoe and one display shoe'
+        if (hasHandheld && bodyAtTop) return 'seated or supported downward try-on pose with hand-held shoe'
+        if (hasHandheld) return 'try-on product display pose with hand-held/supporting shoe'
+        if (wornShoeIndexes.length === 1) return 'single-foot worn product pose'
+        if (wornShoeIndexes.length >= 2 && cameraInference.strongDownwardPose) return 'two-foot downward worn-shoe pose'
+        if (wornShoeIndexes.length >= 2) return 'two-foot worn-shoe pose'
+        return 'display-shoe composition with no confirmed worn foot'
+      }
+      const poseType = inferPoseType()
+      const footSideForShoe = (shoeIndex: number) => {
+        if (!wornShoeIndexes.includes(shoeIndex)) return ''
+        const worn = wornShoeIndexes.map((index) => ({ index, box: metrics(yellowComponents[index]) }))
+        const ordered = worn.slice().sort((a, b) => {
+          const xDelta = a.box.centerX - b.box.centerX
+          if (Math.abs(xDelta) > 8) return xDelta
+          return a.box.centerY - b.box.centerY
+        })
+        if (ordered.length === 1) {
+          const box = ordered[0].box
+          const body = cameraInference.bodyOrigin
+          if (body && Math.abs(box.centerX - body.x) > 8) {
+            return box.centerX < body.x ? 'outer/left-side foot by layout inference' : 'outer/right-side foot by layout inference'
+          }
+          return 'single visible foot; preserve the exact foot side and shoe orientation from the angle reference'
+        }
+        const position = ordered.findIndex((item) => item.index === shoeIndex)
+        if (position < 0) return ''
+        return position % 2 === 0 ? 'left foot of the visible pair' : 'right foot of the visible pair'
+      }
+      const wornPairDirectionLock = wornShoeIndexes.length >= 2
+        ? 'LEFT/RIGHT WORN-SHOE PAIR LOCK: multiple worn shoes are visible. They must be rendered as a natural left-foot/right-foot pair, not two duplicated shoes from the same side. Keep each shoe on its assigned foot side and preserve its own toe/heel axis from the mask; do not copy one worn shoe direction onto the other, do not make both shoes identical same-side orientation, and do not swap left and right feet.'
+        : wornShoeIndexes.length === 1
+          ? 'SINGLE VISIBLE FOOT LOCK: only one worn shoe/foot is visible. Do not invent a second worn foot; preserve the exact single-foot side, toe direction, heel direction, and shoe orientation from the angle reference.'
+          : ''
+      const wornPairMap = wornShoeIndexes.length
+        ? 'Worn shoe foot-side map: ' + wornShoeIndexes.map((shoeIndex) => {
+            const box = metrics(yellowComponents[shoeIndex])
+            return `S${shoeIndex + 1} = ${footSideForShoe(shoeIndex)} at center (${box.centerX}%, ${box.centerY}%)`
+          }).join('; ') + '.'
+        : ''
+      const shoeLimbBindings = [
+        'SHOE LIMB BINDINGS BY CODE:',
+        ...yellowComponents.map((_, index) => {
+          const boundLeg = blueRegionAnalysis
+            .map((region, regionIndex) => ({ region, regionIndex }))
+            .filter(({ region }) => region.kind === 'leg-foot' && region.connectedShoeIndexes.includes(index))
+            .map(({ regionIndex }) => `B${regionIndex + 1}`)
+          const boundHand = blueRegionAnalysis
+            .map((region, regionIndex) => ({ region, regionIndex }))
+            .filter(({ region }) => region.kind === 'hand' && region.connectedShoeIndexes.includes(index))
+            .map(({ regionIndex }) => `B${regionIndex + 1}`)
+          const role = wornShoeIndexes.includes(index)
+            ? 'worn-on-foot'
+            : handHeldShoeIndexes.includes(index)
+              ? 'hand-supported-display'
+              : 'standalone-display'
+          const shoeFirst = shoeFirstBindings[index]
+          const relationDetails = blueComponents
+            .map((limb, limbIndex) => ({ relation: shoeLimbRelation(limb, yellowComponents[index]), limbIndex }))
+            .filter(({ relation }) => relation.broadBoxOverlap > 0.015 || relation.contactPixels > 0 || relation.nearestEndpointDistance <= 10)
+            .map(({ relation, limbIndex }) => `B${limbIndex + 1}:pixelContact=${relation.contactPixels},endpointDist=${Math.round(relation.nearestEndpointDistance)},boxOnly=${relation.likelyOnlyBoxOverlap ? 'yes' : 'no'}`)
+            .join('; ')
+          return `Binding S${index + 1}${shoeInstanceSuffix(index)}: role=${role}, representedShoeCount=${shoeInstanceCounts[index] || 1}, legFoot=${boundLeg.length ? boundLeg.join('/') : 'none'}, hand=${boundHand.length ? boundHand.join('/') : 'none'}, footSide=${footSideForShoe(index) || 'none'}${relationDetails ? `, relationCheck=${relationDetails}` : ''}, shoeFirst=${shoeFirst ? shoeFirst.reason : 'display/no strong blue binding'}`
+        }),
+        'Binding rule: box overlap or foreground occlusion alone is not worn-on-foot. A shoe is WORN only when a blue foot/ankle endpoint or real blue-yellow pixel contact binds to that shoe; otherwise overlapping shoes remain DISPLAY shoes.',
+      ].join('\n')
+      const structuredPoseSchema = [
+        'STRUCTURED ANGLE SCHEMA BY CODE:',
+        `poseType = ${poseType}`,
+        `mainShoeCount = ${mainShoeInstanceCount}`,
+        `shoeObjectCount = ${yellowComponents.length}`,
+        `wornShoeCount = ${wornShoeInstanceCount}`,
+        `handheldOrHandSupportedShoeCount = ${handHeldShoeInstanceCount}`,
+        `standaloneDisplayShoeCount = ${displayShoeInstanceCount}`,
+        `blueLegFootRegionCount = ${legFootRegions.length}`,
+        `blueHandRegionCount = ${handRegions.length}`,
+        `redClothingRegionCount = ${redComponents.length}`,
+        `cameraView = ${cameraInference.label}`,
+        'cropFocus = product-shoe close crop; show only shoes, feet, lower legs, hands if detected, and required clothing hem/partial lower garment; no head, face, portrait, torso, or full upper body',
+        `wornShoes = ${shoeRoleList(wornShoeIndexes)}`,
+        `handheldOrHandSupportedShoes = ${shoeRoleList(handHeldShoeIndexes)}`,
+        `standaloneDisplayShoes = ${shoeRoleList(displayShoeIndexes)}`,
+        'This schema overrides any generic fashion-photo wording. The final image must match these counts and roles.',
+      ].join('\n')
       const controlCanvas = document.createElement('canvas')
       controlCanvas.width = width
       controlCanvas.height = height
@@ -2507,10 +3475,29 @@ function App() {
       drawMaskOutline(control, masks.blue, blueComponents, '#d8d8d8', 0.004)
       drawMaskOutline(control, masks.yellow, yellowComponents, '#ffffff', 0.005)
       control.fillStyle = '#ffffff'
-      control.font = `bold ${Math.max(18, Math.round(width * 0.035))}px Arial`
+      control.font = `bold ${Math.max(16, Math.round(width * 0.028))}px Arial`
       control.textBaseline = 'top'
       yellowComponents.forEach((component, index) => {
-        control.fillText(`S${index + 1}`, component.minX + 8, component.minY + 8)
+        const connectedToLegFoot = shoeConnectedToKind(index, 'leg-foot')
+        const connectedToHand = shoeConnectedToKind(index, 'hand')
+        const label = connectedToLegFoot
+          ? `S${index + 1} WORN${shoeInstanceSuffix(index)}`
+          : connectedToHand
+            ? `S${index + 1} HAND${shoeInstanceSuffix(index)}`
+            : `S${index + 1} DISPLAY${shoeInstanceSuffix(index)}`
+        control.fillText(label, component.minX + 8, component.minY + 8)
+      })
+      control.font = `bold ${Math.max(13, Math.round(width * 0.02))}px Arial`
+      blueRegionAnalysis.forEach((region, index) => {
+        const label = region.kind === 'leg-foot'
+          ? `B${index + 1} FOOT`
+          : region.kind === 'hand'
+            ? `B${index + 1} HAND`
+            : `B${index + 1} DETAIL`
+        control.fillText(label, region.component.minX + 8, region.component.minY + 8)
+      })
+      redComponents.forEach((component, index) => {
+        control.fillText(`R${index + 1} CLOTHING`, component.minX + 8, component.minY + 8)
       })
       const blob = await canvasToBlob(controlCanvas, 'image/png')
       if (!blob) return null
@@ -2518,33 +3505,615 @@ function App() {
       const controlFile = new File([blob], `${fileName}-clean-control.png`, { type: 'image/png' })
       const shoeLines = yellowComponents.map((component, index) => {
         const box = metrics(component)
+        const axis = axisForComponent(masks.yellow, component)
         const orientation = box.boxWidth >= box.boxHeight * 1.15 ? 'mostly horizontal / side-view' : box.boxHeight >= box.boxWidth * 1.15 ? 'mostly vertical / front-back' : 'diagonal or three-quarter'
-        const connectedToLimb = touchesAny(component, blueComponents, 0.08)
-        const status = connectedToLimb ? 'WORN SHOE connected to a blue foot/ankle/leg region' : 'DISPLAY SHOE with no foot or leg inside it'
-        return `S${index + 1}: ${status}; bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%, ${box.centerY}%), orientation ${orientation}. If DISPLAY SHOE, generate only the product shoe at this coordinate and do not add a foot, ankle, leg, or body limb to wear it.`
+        const connectedToLegFoot = shoeConnectedToKind(index, 'leg-foot')
+        const connectedToHand = shoeConnectedToKind(index, 'hand')
+        const status = connectedToLegFoot
+          ? 'WORN SHOE connected to a blue leg/foot/ankle region'
+          : connectedToHand
+            ? 'HANDHELD / HAND-SUPPORTED DISPLAY SHOE connected to a blue hand/finger region, not worn on a foot'
+            : 'DISPLAY SHOE with no foot or leg inside it'
+        const footSide = connectedToLegFoot ? footSideForShoe(index) : ''
+        const body = cameraInference.bodyOrigin
+        const toeHeel = axis && body
+          ? (() => {
+              const startDistance = Math.hypot(axis.start.x - body.x, axis.start.y - body.y)
+              const endDistance = Math.hypot(axis.end.x - body.x, axis.end.y - body.y)
+              const heel = startDistance <= endDistance ? axis.start : axis.end
+              const toe = startDistance <= endDistance ? axis.end : axis.start
+              return ` Code-inferred shoe axis: heel/body-side endpoint near (${heel.x}%, ${heel.y}%), toe/front endpoint toward (${toe.x}%, ${toe.y}%), toe direction ${directionFromDelta(toe.x - heel.x, toe.y - heel.y)}. Preserve this toe/heel direction and do not reverse the shoe.`
+            })()
+          : axis
+            ? ` Code-inferred shoe axis endpoint A (${axis.start.x}%, ${axis.start.y}%) to endpoint B (${axis.end.x}%, ${axis.end.y}%), axis direction ${axis.direction}; preserve this shoe rotation.`
+            : ''
+        return `S${index + 1}${shoeInstanceSuffix(index)}: ${status}; representedShoeCount=${shoeInstanceCounts[index] || 1}${footSide ? `; foot-side inference: ${footSide}` : ''}; bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%, ${box.centerY}%), orientation ${orientation}.${toeHeel} If representedShoeCount is 2, generate two matching product shoes inside this S object while preserving this same layout region and role. If this is one of multiple WORN SHOES, it must remain the matching left/right foot counterpart indicated above and must not duplicate the other worn shoe direction. If DISPLAY or HANDHELD shoe, generate only the product shoe(s) at this coordinate and do not add a foot, ankle, leg, or body limb to wear it; if hand-supported, the hand may touch/support the shoe but must not become a foot.`
       })
-      const limbLines = blueComponents.map((component, index) => {
+      const limbLines = blueRegionAnalysis.map((region, index) => {
+        const component = region.component
         const box = metrics(component)
-        return `B${index + 1}: body limb region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%, ${box.centerY}%).`
+        const axis = axisForComponent(masks.blue, component)
+        const role = region.kind === 'leg-foot'
+          ? 'LEG/FOOT/ANKLE'
+          : region.kind === 'hand'
+            ? 'HAND/HANDWRIST/FINGER'
+            : 'MINOR BLUE DETAIL'
+        const axisText = axis ? ` Main axis runs from (${axis.start.x}%, ${axis.start.y}%) to (${axis.end.x}%, ${axis.end.y}%), direction ${axis.direction}; preserve this object direction and bend.` : ''
+        const shoeText = region.connectedShoeIndexes.length ? ` Connected shoe objects: ${region.connectedShoeIndexes.map((shoeIndex) => `S${shoeIndex + 1}`).join(', ')}.` : ''
+        const footSideText = region.kind === 'leg-foot' && region.connectedShoeIndexes.length
+          ? ` Foot-side binding: ${region.connectedShoeIndexes.map((shoeIndex) => `S${shoeIndex + 1} = ${footSideForShoe(shoeIndex) || 'preserve visible foot side from mask'}`).join('; ')}.`
+          : ''
+        const actionText = region.kind === 'leg-foot'
+          ? 'Generate this region as natural female leg/foot/ankle anatomy; if connected to a shoe, that shoe is worn on this exact foot side. Do not mirror-copy another foot or shoe direction into this region.'
+          : region.kind === 'hand'
+            ? 'Generate this region as a realistic hand/wrist/fingers holding, touching, or supporting the nearby shoe; do not convert it into a leg or foot.'
+            : 'Do not generate this as an extra independent limb; merge it into the nearest hand/foot detail if needed.'
+        return `B${index + 1}: ${role} (${region.confidence} confidence); bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%, ${box.centerY}%).${axisText}${shoeText}${footSideText} ${actionText} Reason: ${region.reason}.`
       })
       const clothingLines = redComponents.map((component, index) => {
         const box = metrics(component)
-        return `R${index + 1}: clothing region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%, ${box.centerY}%).`
+        const axis = axisForComponent(masks.red, component)
+        const axisText = axis ? ` Main clothing axis runs from (${axis.start.x}%, ${axis.start.y}%) to (${axis.end.x}%, ${axis.end.y}%), direction ${axis.direction}.` : ''
+        const connectedBlue = blueRegionAnalysis
+          .map((region, regionIndex) => ({ region, regionIndex }))
+          .filter(({ region }) => touchesAny(component, [region.component], 0.08))
+          .map(({ regionIndex }) => `B${regionIndex + 1}`)
+        return `R${index + 1}: CLOTHING REGION / lower-body garment support, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%, ${box.centerY}%).${axisText} Connected body regions: ${connectedBlue.length ? connectedBlue.join(', ') : 'none'}. Put model-reference clothing only inside this red/R region; do not create head, face, torso, or full upper body.`
       })
+      const bodyDirectionLock = [
+        cameraInference.bodyOrigin && cameraInference.shoeTarget
+          ? `BODY DIRECTION LOCK: code detects the body/clothing origin at ${pointLabel(cameraInference.bodyOrigin.x, cameraInference.bodyOrigin.y)} and the shoe target at ${pointLabel(cameraInference.shoeTarget.x, cameraInference.shoeTarget.y)}. Legs and shoes must travel from the body origin toward ${cameraInference.extensionDirection}.`
+          : '',
+        cameraInference.strongDownwardPose
+          ? 'CAMERA LOCK: use a top-down / first-person downward high-angle camera. Do not convert this to an eye-level, front-facing, side-view, standing catalog pose.'
+          : '',
+      ].filter(Boolean).join('\n')
+      const controlImageExplanation = [
+        'CONTROL IMAGE EXPLANATION FOR THIS UPLOADED ANGLE IMAGE:',
+        'Dynamic explanation: this explanation is generated from the current uploaded angle image only. Do not reuse it for other angle images and do not treat it as a fixed template.',
+        'Visual warning: the cleaned control image, labels, coordinate grid, line colors, guide fills, gray/white marks, and original yellow/blue/red/black mask colors are invisible metadata only. None of them may appear in the final generated image.',
+        'Shoe-first binding rule from code: each yellow S shoe is first classified as WORN, HAND-SUPPORTED, or DISPLAY based on real blue-yellow pixel contact, blue endpoint distance, blue-inside-shoe ratio, red clothing connection, and box-only rejection. DISPLAY shoes must not gain feet or legs.',
+        'Hand/leg contour rule from code: blue regions with a broad continuous ankle/instep contour entering a yellow shoe are LEG/FOOT. Blue regions ending in multiple narrow separated tips near a yellow shoe are HAND/FINGERS. This rule is applied dynamically to the current uploaded angle image.',
+        crossedLegSplitApplied ? 'Crossed-leg rule from code: one connected blue body mass was split into separate B leg/foot regions because multiple shoe anchors indicate a crossed-leg pose. Preserve the crossing order and do not merge the two legs into one limb.' : '',
+        `For this image, the detected pose is "${poseType}". The detected camera is "${cameraInference.label}". The required crop is a product-shoe close crop: shoes must be the main focus, with only feet, lower legs, hands if detected, and required clothing hem/partial lower garment.`,
+        cameraInference.bodyOrigin && cameraInference.shoeTarget
+          ? `For this image, the body/clothing origin is around (${cameraInference.bodyOrigin.x}%, ${cameraInference.bodyOrigin.y}%) and the shoe target is around (${cameraInference.shoeTarget.x}%, ${cameraInference.shoeTarget.y}%). Body/limbs/shoes must extend toward ${cameraInference.extensionDirection}; do not flip, recenter, or convert this into a generic pose.`
+          : 'For this image, preserve the uploaded angle reference coordinate relationship exactly; do not recenter or replace it with a generic pose.',
+        `For this image, detected shoe objects: ${yellowComponents.length}, represented actual shoe count: ${mainShoeInstanceCount}. Worn shoes: ${shoeRoleList(wornShoeIndexes)}. Hand-supported shoes: ${shoeRoleList(handHeldShoeIndexes)}. Standalone display shoes: ${shoeRoleList(displayShoeIndexes)}. If an S object has x2, it represents two product shoes within the same layout object.`,
+        ...yellowComponents.map((component, index) => {
+          const box = metrics(component)
+          const role = wornShoeIndexes.includes(index)
+            ? `worn on foot${footSideForShoe(index) ? ` (${footSideForShoe(index)})` : ''}`
+            : handHeldShoeIndexes.includes(index)
+              ? 'hand-supported / handheld display shoe'
+              : 'standalone display shoe'
+          const connectedLegs = blueRegionAnalysis
+            .map((region, regionIndex) => ({ region, regionIndex }))
+            .filter(({ region }) => region.kind === 'leg-foot' && region.connectedShoeIndexes.includes(index))
+            .map(({ regionIndex }) => `B${regionIndex + 1}`)
+          const connectedHands = blueRegionAnalysis
+            .map((region, regionIndex) => ({ region, regionIndex }))
+            .filter(({ region }) => region.kind === 'hand' && region.connectedShoeIndexes.includes(index))
+            .map(({ regionIndex }) => `B${regionIndex + 1}`)
+          return `S object explanation: S${index + 1}${shoeInstanceSuffix(index)} is ${role}, representedShoeCount=${shoeInstanceCounts[index] || 1}, located at bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%, ${box.centerY}%). Connected leg/foot regions: ${connectedLegs.length ? connectedLegs.join('/') : 'none'}. Connected hand regions: ${connectedHands.length ? connectedHands.join('/') : 'none'}.`
+        }),
+        ...blueRegionAnalysis.map((region, index) => {
+          const box = metrics(region.component)
+          const role = region.kind === 'leg-foot'
+            ? 'real leg/foot/ankle anatomy'
+            : region.kind === 'hand'
+              ? 'real hand/wrist/fingers'
+              : 'minor detail, not an independent limb'
+          return `B object explanation: B${index + 1} is ${role}, confidence ${region.confidence}, center (${box.centerX}%, ${box.centerY}%), connected shoes ${region.connectedShoeIndexes.length ? region.connectedShoeIndexes.map((shoeIndex) => `S${shoeIndex + 1}`).join('/') : 'none'}.`
+        }),
+        redComponents.length
+          ? `For this image, detected clothing support regions: ${redComponents.length}. They only create lower-body clothing/hem/partial garment from the model reference; they must not create head, face, torso, portrait, or full upper body.`
+          : 'For this image, no major red clothing region is detected; keep clothing minimal and cropped out unless needed by the lower-body pose.',
+        ...redComponents.map((component, index) => {
+          const box = metrics(component)
+          return `R object explanation: R${index + 1} is secondary clothing support only, located at bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%, ${box.centerY}%).`
+        }),
+        'Generation instruction from this explanation: first understand the S/B/R objects and their roles from this explanation, then generate a realistic commercial footwear photo. The final image must not look like the control image.',
+      ].filter(Boolean).join('\n')
       const layout = [
         'CLEANED ANGLE CONTROL HARD CONSTRAINT:',
-        'The cleaned control image is a black/gray/white coordinate guide only. It is not a visual style reference. Do not render any control colors, mask colors, labels, grid lines, boxes, outlines, or flat guide marks in the final image.',
+        'CODE CONTROL SCOPE: the cleaned control image and code analysis control only angle, depth ordering, pose, object counts, hand/foot candidates, shoe-limb bindings, coordinates, and occlusion. They do not control lighting, color grading, texture, shadow softness, material quality, background mood, contrast, or photographic finish.',
+        'The cleaned control image is a neutral layout guide only. It is not a visual style reference. Do not render any control colors, mask colors, labels, grid lines, boxes, outlines, gray wash, white guide fills, or flat guide marks in the final image.',
         'Coordinate system: use the uploaded/cleaned angle image as a 2D canvas. X axis goes left-to-right from X0 to X100. Y axis goes top-to-bottom from Y0 to Y100. Keep every shoe, limb, clothing area, and background boundary at the same relative X/Y coordinates and scale.',
+        controlImageExplanation,
         `Camera inference by code: ${cameraInference.label}. ${cameraInference.instruction}`,
-        `The cleaned control image is generated from the uploaded angle reference and must be used as the strongest layout control. Main shoe count is exactly ${yellowComponents.length}. Do not create more or fewer main shoes.`,
-        'Use yellow S regions as main product shoe objects. Internal holes, straps, buckles, openings, shadows, and thin lines from the original angle reference have been merged into their nearest main shoe object and must not become extra shoes.',
-        'Worn/display rule: only yellow S regions touching a blue body-limb region are worn shoes. Any yellow S region not touching blue is a standalone display shoe and must not have a foot, ankle, leg, or body limb generated inside or attached to it.',
+        structuredPoseSchema,
+        depthLayerMap,
+        clothingRegionMap,
+        skeletonMap,
+        candidateMap,
+        shoeLimbBindings,
+        bodyDirectionLock,
+        `Main shoe count is exactly ${mainShoeInstanceCount}. There are ${yellowComponents.length} S layout object(s); any S object marked x2 represents two actual product shoes inside that same layout object. Use S objects for product-shoe placement/angle only; product appearance still comes only from the uploaded product shoe image.`,
+        'Internal shoe holes, straps, buckles, openings, shadows, and thin lines belong to their nearest S shoe object and must not become extra shoes.',
+        `Blue region classification by code: ${legFootRegions.length} leg/foot/ankle region(s), ${handRegions.length} hand/wrist/finger region(s), ${detailRegions.length} minor detail region(s). A blue hand region must stay a hand; a blue leg/foot region must stay leg/foot. Do not turn hands into legs, do not turn finger fragments into extra limbs, and do not invent extra legs from the number of blue fragments.`,
+        `Red clothing classification by code: ${redComponents.length} clothing support region(s). Red regions must become only the lower-body clothing portions required around the legs/shoes; they must not cause the model face, head, portrait, torso, or full upper body to appear.`,
+        'Product-shoe crop rule: camera must be aimed at the product shoes. Keep the product shoes as the largest/clearest subject; crop away any unnecessary upper body.',
+        wornPairDirectionLock,
+        wornPairMap,
+        'Worn/display rule: only yellow S regions with strong foot binding to a blue LEG/FOOT/ANKLE endpoint or real blue-yellow pixel contact are worn shoes. Box overlap, foreground occlusion, or a shoe crossing in front of a foot does not make it worn. Yellow S regions connected to blue HAND/HANDWRIST/FINGER regions are handheld or hand-supported display shoes, not worn shoes. Any yellow S region without strong foot binding is a standalone display shoe and must not have a foot, ankle, leg, or body limb generated inside or attached to it.',
         shoeLines.join('\n'),
         limbLines.length ? 'Blue body-limb regions:\n' + limbLines.join('\n') : 'No major blue body-limb region detected; do not invent extra limbs unless required by a yellow worn-shoe object.',
         clothingLines.length ? 'Red clothing regions:\n' + clothingLines.join('\n') : 'No major red clothing region detected; keep clothing minimal or cropped out.',
         'Black/empty areas in the cleaned control are background/environment areas from the uploaded background reference.',
-        'Final image must not show labels S1/S2, mask colors, boxes, outlines, or flat color-block artifacts.',
+        'Final image must not show labels S1/S2, mask colors, control colors, gray guide wash, boxes, outlines, grid lines, or flat color-block artifacts.',
       ].filter(Boolean).join('\n')
+      return { file: controlFile, layout }
+    } catch {
+      return null
+    }
+  }
+
+  async function buildHandAngleControl(file: File) {
+    try {
+      const bitmap = await createImageBitmap(file)
+      const width = bitmap.width
+      const height = bitmap.height
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const context = canvas.getContext('2d', { willReadFrequently: true })
+      if (!context) return null
+      context.drawImage(bitmap, 0, 0, width, height)
+      const pixels = context.getImageData(0, 0, width, height).data
+      const masks = {
+        yellow: new Uint8Array(width * height),
+        blue: new Uint8Array(width * height),
+        red: new Uint8Array(width * height),
+        black: new Uint8Array(width * height),
+      }
+      for (let index = 0; index < width * height; index += 1) {
+        const offset = index * 4
+        const r = pixels[offset]
+        const g = pixels[offset + 1]
+        const b = pixels[offset + 2]
+        const a = pixels[offset + 3]
+        if (a < 24) continue
+        if (r > 150 && g > 125 && b < 135 && r + g > b * 2 + 110) masks.yellow[index] = 1
+        else if (b > 110 && r < 135 && g < 170 && b > r * 1.15 && b > g * 1.05) masks.blue[index] = 1
+        else if (r > 135 && g < 130 && b < 130 && r > g * 1.2 && r > b * 1.2) masks.red[index] = 1
+        else if (r < 55 && g < 55 && b < 55) masks.black[index] = 1
+      }
+
+      type HandAngleComponent = { minX: number; minY: number; maxX: number; maxY: number; count: number }
+      const findComponents = (mask: Uint8Array, minRatio = 0.0012) => {
+        const visited = new Uint8Array(mask.length)
+        const components: HandAngleComponent[] = []
+        const minCount = Math.max(10, width * height * minRatio)
+        for (let startIndex = 0; startIndex < mask.length; startIndex += 1) {
+          if (!mask[startIndex] || visited[startIndex]) continue
+          const queue = [startIndex]
+          visited[startIndex] = 1
+          let cursor = 0
+          let minX = width
+          let minY = height
+          let maxX = 0
+          let maxY = 0
+          let count = 0
+          while (cursor < queue.length) {
+            const current = queue[cursor++]
+            const x = current % width
+            const y = Math.floor(current / width)
+            minX = Math.min(minX, x)
+            minY = Math.min(minY, y)
+            maxX = Math.max(maxX, x)
+            maxY = Math.max(maxY, y)
+            count += 1
+            const neighbors = [current - 1, current + 1, current - width, current + width]
+            for (const next of neighbors) {
+              if (next < 0 || next >= mask.length || visited[next] || !mask[next]) continue
+              const nx = next % width
+              if (Math.abs(nx - x) > 1) continue
+              visited[next] = 1
+              queue.push(next)
+            }
+          }
+          if (count >= minCount) components.push({ minX, minY, maxX, maxY, count })
+        }
+        return components.sort((a, b) => b.count - a.count)
+      }
+      const metrics = (component: HandAngleComponent) => {
+        const left = Math.round((component.minX / width) * 100)
+        const top = Math.round((component.minY / height) * 100)
+        const boxWidth = Math.round(((component.maxX - component.minX + 1) / width) * 100)
+        const boxHeight = Math.round(((component.maxY - component.minY + 1) / height) * 100)
+        const centerX = Math.round((((component.minX + component.maxX) / 2) / width) * 100)
+        const centerY = Math.round((((component.minY + component.maxY) / 2) / height) * 100)
+        return { left, top, boxWidth, boxHeight, centerX, centerY }
+      }
+      const handDirectionFromDelta = (dx: number, dy: number) => {
+        const horizontal = dx < -8 ? 'left' : dx > 8 ? 'right' : ''
+        const vertical = dy < -8 ? 'upper' : dy > 8 ? 'lower' : ''
+        if (vertical && horizontal) return `${vertical}-${horizontal}`
+        return vertical || horizontal || 'center'
+      }
+      const axisForComponent = (mask: Uint8Array, component: HandAngleComponent) => {
+        let count = 0
+        let sumX = 0
+        let sumY = 0
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!mask[index]) continue
+            count += 1
+            sumX += x
+            sumY += y
+          }
+        }
+        if (!count) return null
+        const meanX = sumX / count
+        const meanY = sumY / count
+        let covXX = 0
+        let covXY = 0
+        let covYY = 0
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!mask[index]) continue
+            const dx = x - meanX
+            const dy = y - meanY
+            covXX += dx * dx
+            covXY += dx * dy
+            covYY += dy * dy
+          }
+        }
+        const angle = 0.5 * Math.atan2(2 * covXY, covXX - covYY)
+        const vx = Math.cos(angle)
+        const vy = Math.sin(angle)
+        let minProjection = Number.POSITIVE_INFINITY
+        let maxProjection = Number.NEGATIVE_INFINITY
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (!mask[index]) continue
+            const projection = (x - meanX) * vx + (y - meanY) * vy
+            minProjection = Math.min(minProjection, projection)
+            maxProjection = Math.max(maxProjection, projection)
+          }
+        }
+        const start = {
+          x: Math.round(((meanX + vx * minProjection) / width) * 100),
+          y: Math.round(((meanY + vy * minProjection) / height) * 100),
+        }
+        const end = {
+          x: Math.round(((meanX + vx * maxProjection) / width) * 100),
+          y: Math.round(((meanY + vy * maxProjection) / height) * 100),
+        }
+        return { start, end, direction: handDirectionFromDelta(end.x - start.x, end.y - start.y) }
+      }
+      const expandBox = (component: HandAngleComponent, ratio = 0.08) => {
+        const boxWidth = component.maxX - component.minX + 1
+        const boxHeight = component.maxY - component.minY + 1
+        const padX = Math.round(boxWidth * ratio)
+        const padY = Math.round(boxHeight * ratio)
+        return {
+          minX: Math.max(0, component.minX - padX),
+          minY: Math.max(0, component.minY - padY),
+          maxX: Math.min(width - 1, component.maxX + padX),
+          maxY: Math.min(height - 1, component.maxY + padY),
+          count: component.count,
+        }
+      }
+      const boxesOverlap = (a: HandAngleComponent, b: HandAngleComponent) =>
+        a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY
+      const intersectionArea = (a: HandAngleComponent, b: HandAngleComponent) => {
+        const left = Math.max(a.minX, b.minX)
+        const top = Math.max(a.minY, b.minY)
+        const right = Math.min(a.maxX, b.maxX)
+        const bottom = Math.min(a.maxY, b.maxY)
+        if (right < left || bottom < top) return 0
+        return (right - left + 1) * (bottom - top + 1)
+      }
+      const boxArea = (component: HandAngleComponent) =>
+        Math.max(1, (component.maxX - component.minX + 1) * (component.maxY - component.minY + 1))
+      const centerInsideBox = (inner: HandAngleComponent, outer: HandAngleComponent, paddingRatio = 0) => {
+        const expanded = expandBox(outer, paddingRatio)
+        const centerX = (inner.minX + inner.maxX) / 2
+        const centerY = (inner.minY + inner.maxY) / 2
+        return centerX >= expanded.minX && centerX <= expanded.maxX && centerY >= expanded.minY && centerY <= expanded.maxY
+      }
+      const touchIndexes = (component: HandAngleComponent, others: HandAngleComponent[], ratio = 0.08) => {
+        const expanded = expandBox(component, ratio)
+        return others
+          .map((other, index) => ({ other, index }))
+          .filter(({ other }) => boxesOverlap(expanded, expandBox(other, ratio)))
+          .map(({ index }) => index)
+      }
+      const analyzeBlueContour = (component: HandAngleComponent) => {
+        const componentWidth = component.maxX - component.minX + 1
+        const componentHeight = component.maxY - component.minY + 1
+        const bboxArea = boxArea(component)
+        const fillRatio = component.count / bboxArea
+        let maxRowRuns = 0
+        let maxColRuns = 0
+        let splitRows = 0
+        let splitCols = 0
+        let terminalSplitRows = 0
+        let terminalSplitCols = 0
+        const rowWidths: number[] = []
+        const colHeights: number[] = []
+        const rowTerminal = Math.max(2, Math.round(componentHeight * 0.24))
+        const colTerminal = Math.max(2, Math.round(componentWidth * 0.24))
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          let runs = 0
+          let inRun = false
+          let pixelsInRow = 0
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const active = Boolean(masks.blue[y * width + x])
+            if (active) {
+              pixelsInRow += 1
+              if (!inRun) runs += 1
+              inRun = true
+            } else {
+              inRun = false
+            }
+          }
+          if (pixelsInRow > 0) rowWidths.push(pixelsInRow)
+          maxRowRuns = Math.max(maxRowRuns, runs)
+          if (runs >= 2) {
+            splitRows += 1
+            if (y <= component.minY + rowTerminal || y >= component.maxY - rowTerminal) terminalSplitRows += 1
+          }
+        }
+        for (let x = component.minX; x <= component.maxX; x += 1) {
+          let runs = 0
+          let inRun = false
+          let pixelsInCol = 0
+          for (let y = component.minY; y <= component.maxY; y += 1) {
+            const active = Boolean(masks.blue[y * width + x])
+            if (active) {
+              pixelsInCol += 1
+              if (!inRun) runs += 1
+              inRun = true
+            } else {
+              inRun = false
+            }
+          }
+          if (pixelsInCol > 0) colHeights.push(pixelsInCol)
+          maxColRuns = Math.max(maxColRuns, runs)
+          if (runs >= 2) {
+            splitCols += 1
+            if (x <= component.minX + colTerminal || x >= component.maxX - colTerminal) terminalSplitCols += 1
+          }
+        }
+        const averageRowWidth = rowWidths.reduce((sum, value) => sum + value, 0) / Math.max(1, rowWidths.length)
+        const maxRowWidth = Math.max(...rowWidths, 0)
+        const minUsefulRowWidth = Math.min(...rowWidths.filter((value) => value >= averageRowWidth * 0.35), maxRowWidth || 1)
+        const averageColHeight = colHeights.reduce((sum, value) => sum + value, 0) / Math.max(1, colHeights.length)
+        const maxColHeight = Math.max(...colHeights, 0)
+        const minUsefulColHeight = Math.min(...colHeights.filter((value) => value >= averageColHeight * 0.35), maxColHeight || 1)
+        const widthVariation = maxRowWidth / Math.max(1, minUsefulRowWidth)
+        const heightVariation = maxColHeight / Math.max(1, minUsefulColHeight)
+        const manyFingerSplits =
+          maxRowRuns >= 3 ||
+          maxColRuns >= 3 ||
+          terminalSplitRows >= 2 ||
+          terminalSplitCols >= 2 ||
+          splitRows >= Math.max(3, componentHeight * 0.08) ||
+          splitCols >= Math.max(3, componentWidth * 0.08)
+        const narrowProngShape =
+          (widthVariation >= 2.6 || heightVariation >= 2.6) &&
+          (fillRatio < 0.58 || componentWidth <= width * 0.18 || componentHeight <= height * 0.28)
+        const fingerContourLock = manyFingerSplits || narrowProngShape
+        const ankleLimbLock =
+          !fingerContourLock &&
+          fillRatio >= 0.34 &&
+          Math.max(componentWidth, componentHeight) / Math.max(1, Math.min(componentWidth, componentHeight)) >= 1.65 &&
+          maxRowRuns <= 2 &&
+          maxColRuns <= 2 &&
+          splitRows <= Math.max(2, componentHeight * 0.06) &&
+          splitCols <= Math.max(2, componentWidth * 0.06)
+        return {
+          fingerContourLock,
+          ankleLimbLock,
+          maxRowRuns,
+          maxColRuns,
+          splitRows,
+          splitCols,
+          terminalSplitRows,
+          terminalSplitCols,
+          widthVariation,
+          heightVariation,
+        }
+      }
+      const classifyBlue = (component: HandAngleComponent, shoeIndexes: number[], clothingIndexes: number[]) => {
+        const box = metrics(component)
+        const bboxArea = boxArea(component)
+        const fillRatio = component.count / bboxArea
+        const contour = analyzeBlueContour(component)
+        const compact = box.boxWidth <= 24 && box.boxHeight <= 24
+        const slender = Math.max(box.boxWidth, box.boxHeight) / Math.max(1, Math.min(box.boxWidth, box.boxHeight)) >= 2.2
+        const largeLowerLimb = box.boxHeight >= 28 || component.count / Math.max(1, width * height) > 0.025
+        const nearShoe = shoeIndexes.length > 0
+        const nearClothing = clothingIndexes.length > 0
+        const shoeRelations = shoeIndexes.map((shoeIndex) => {
+          const shoe = shoes[shoeIndex]
+          const shoeBox = metrics(shoe)
+          const overlap = intersectionArea(component, shoe)
+          const componentOverlap = overlap / bboxArea
+          const shoeOverlap = overlap / boxArea(shoe)
+          const centerInsideShoe = centerInsideBox(component, shoe, 0.02)
+          const centerInsideShoeCore = centerInsideBox(component, shoe, -0.08)
+          const shoeCenterYPx = (shoe.minY + shoe.maxY) / 2
+          const blueCenterYPx = (component.minY + component.maxY) / 2
+          const shoeHeightPx = Math.max(1, shoe.maxY - shoe.minY + 1)
+          const blueCenterXPercent = ((component.minX + component.maxX) / 2 / width) * 100
+          const blueCenterYPercent = (blueCenterYPx / height) * 100
+          const insideShoeEnvelope =
+            blueCenterXPercent >= shoeBox.left - 2 &&
+            blueCenterXPercent <= shoeBox.left + shoeBox.boxWidth + 2 &&
+            blueCenterYPercent >= shoeBox.top - 3 &&
+            blueCenterYPercent <= shoeBox.top + shoeBox.boxHeight + 4
+          const shoeUpperOrMiddleEntry =
+            insideShoeEnvelope &&
+            blueCenterYPx <= shoeCenterYPx + shoeHeightPx * 0.22
+          const belowShoeGripZone =
+            blueCenterYPx > shoeCenterYPx + shoeHeightPx * 0.22 ||
+            component.minY > shoe.minY + shoeHeightPx * 0.62
+          const verticalInsideShoe =
+            component.minY >= shoe.minY - height * 0.03 &&
+            component.maxY <= shoe.maxY + height * 0.08
+          const entersShoeBody = (centerInsideShoe && componentOverlap >= 0.18 && verticalInsideShoe && !belowShoeGripZone) || shoeUpperOrMiddleEntry
+          const outsideShoeGrip =
+            (belowShoeGripZone && componentOverlap < 0.28) ||
+            (!centerInsideShoe &&
+              componentOverlap < 0.16 &&
+              (box.centerX < shoeBox.left || box.centerX > shoeBox.left + shoeBox.boxWidth || box.centerY > shoeBox.top + shoeBox.boxHeight))
+          return { shoeIndex, shoeBox, componentOverlap, shoeOverlap, centerInsideShoe, centerInsideShoeCore, entersShoeBody, outsideShoeGrip, belowShoeGripZone, shoeUpperOrMiddleEntry }
+        })
+        const entersShoeBody = shoeRelations.some((relation) => relation.entersShoeBody || (relation.centerInsideShoeCore && !relation.belowShoeGripZone))
+        const mostlyInsideShoe = shoeRelations.some((relation) => relation.componentOverlap >= 0.34 && relation.centerInsideShoe)
+        const outerGrip = shoeRelations.some((relation) => relation.outsideShoeGrip)
+        const ankleShoeLock = nearShoe && contour.ankleLimbLock && !outerGrip
+        const clothingSideHandLock = !nearShoe && nearClothing && contour.fingerContourLock
+        const aboveShoe = shoeIndexes.some((shoeIndex) => {
+          const shoeBox = metrics(shoes[shoeIndex])
+          return box.centerY < shoeBox.centerY && box.centerX > shoeBox.left - 8 && box.centerX < shoeBox.left + shoeBox.boxWidth + 8
+        })
+        const outsideShoeSide = shoeIndexes.some((shoeIndex) => {
+          const shoeBox = metrics(shoes[shoeIndex])
+          return box.centerX < shoeBox.left - 2 ||
+            box.centerX > shoeBox.left + shoeBox.boxWidth + 2 ||
+            box.centerY < shoeBox.top - 2
+        })
+        const handScore =
+          (compact ? 4 : 0) +
+          (fillRatio < 0.42 ? 3 : 0) +
+          (nearShoe && outsideShoeSide ? 3 : 0) +
+          (outerGrip ? 8 : 0) +
+          (!nearClothing && nearShoe ? 2 : 0) +
+          (box.boxWidth <= 18 || box.boxHeight <= 18 ? 2 : 0)
+        const footScore =
+          (entersShoeBody ? 10 : 0) +
+          (mostlyInsideShoe ? 7 : 0) +
+          (largeLowerLimb && !outerGrip ? 4 : 0) +
+          (slender ? 3 : 0) +
+          (nearClothing && entersShoeBody ? 3 : 0) +
+          (nearShoe && aboveShoe ? 4 : 0) +
+          (fillRatio >= 0.38 ? 2 : 0)
+        const fingerContourLock = contour.fingerContourLock && !ankleShoeLock && !mostlyInsideShoe
+        const shoeInsertionLock = ankleShoeLock || entersShoeBody || mostlyInsideShoe
+        const handGripLock = (outerGrip || fingerContourLock || clothingSideHandLock) && !shoeInsertionLock
+        const kind = handGripLock ? 'HAND' : shoeInsertionLock ? 'FOOT/LEG' : footScore >= handScore ? 'FOOT/LEG' : 'HAND'
+        const reason = `handScore=${handScore}, footScore=${footScore}, fingerContourLock=${fingerContourLock ? 'yes' : 'no'}, ankleShoeLock=${ankleShoeLock ? 'yes' : 'no'}, clothingSideHandLock=${clothingSideHandLock ? 'yes' : 'no'}, shoeInsertionLock=${shoeInsertionLock ? 'yes' : 'no'}, handGripLock=${handGripLock ? 'yes' : 'no'}, entersShoeBody=${entersShoeBody ? 'yes' : 'no'}, mostlyInsideShoe=${mostlyInsideShoe ? 'yes' : 'no'}, outerGrip=${outerGrip ? 'yes' : 'no'}, rowRuns=${contour.maxRowRuns}, colRuns=${contour.maxColRuns}, terminalSplits=${contour.terminalSplitRows}/${contour.terminalSplitCols}, compact=${compact ? 'yes' : 'no'}, slender=${slender ? 'yes' : 'no'}, fill=${fillRatio.toFixed(2)}, touchingShoes=${shoeIndexes.length ? shoeIndexes.map((index) => `S${index + 1}`).join('/') : 'none'}, touchingClothing=${clothingIndexes.length ? clothingIndexes.map((index) => `R${index + 1}`).join('/') : 'none'}`
+        return { kind, reason }
+      }
+      const drawMask = (ctx: CanvasRenderingContext2D, mask: Uint8Array, components: HandAngleComponent[], stroke: string, fill: string) => {
+        ctx.save()
+        ctx.fillStyle = fill
+        for (const component of components) {
+          for (let y = component.minY; y <= component.maxY; y += 1) {
+            for (let x = component.minX; x <= component.maxX; x += 1) {
+              const index = y * width + x
+              if (!mask[index]) continue
+              ctx.fillRect(x, y, 1, 1)
+            }
+          }
+        }
+        ctx.strokeStyle = stroke
+        ctx.lineWidth = Math.max(2, Math.round(Math.max(width, height) * 0.004))
+        for (const component of components) {
+          const box = expandBox(component, 0.018)
+          ctx.strokeRect(box.minX, box.minY, box.maxX - box.minX + 1, box.maxY - box.minY + 1)
+        }
+        ctx.restore()
+      }
+
+      const shoes = findComponents(masks.yellow, 0.0012).slice(0, 8)
+      const bodyCandidates = findComponents(masks.blue, 0.0012).slice(0, 10)
+      const clothes = findComponents(masks.red, 0.002).slice(0, 6)
+      const blueClassifications = bodyCandidates.map((component) => {
+        const touchingShoes = touchIndexes(component, shoes, 0.08)
+        const touchingClothing = touchIndexes(component, clothes, 0.08)
+        return classifyBlue(component, touchingShoes, touchingClothing)
+      })
+      const controlCanvas = document.createElement('canvas')
+      controlCanvas.width = width
+      controlCanvas.height = height
+      const control = controlCanvas.getContext('2d')
+      if (!control) return null
+      control.fillStyle = '#050505'
+      control.fillRect(0, 0, width, height)
+      control.strokeStyle = 'rgba(255,255,255,0.25)'
+      control.fillStyle = 'rgba(255,255,255,0.86)'
+      control.lineWidth = Math.max(1, Math.round(Math.max(width, height) * 0.002))
+      control.font = `bold ${Math.max(12, Math.round(width * 0.022))}px Arial`
+      ;[0, 25, 50, 75, 100].forEach((value) => {
+        const x = Math.round((value / 100) * width)
+        const y = Math.round((value / 100) * height)
+        control.beginPath()
+        control.moveTo(x, 0)
+        control.lineTo(x, height)
+        control.stroke()
+        control.beginPath()
+        control.moveTo(0, y)
+        control.lineTo(width, y)
+        control.stroke()
+        control.fillText(`X${value}`, Math.min(width - 42, x + 4), 4)
+        control.fillText(`Y${value}`, 4, Math.min(height - 20, y + 4))
+      })
+      drawMask(control, masks.red, clothes, '#b8b8b8', 'rgba(184,184,184,0.28)')
+      drawMask(control, masks.blue, bodyCandidates, '#d8d8d8', 'rgba(216,216,216,0.26)')
+      drawMask(control, masks.yellow, shoes, '#ffffff', 'rgba(255,255,255,0.22)')
+      control.fillStyle = '#ffffff'
+      control.textBaseline = 'top'
+      control.font = `bold ${Math.max(15, Math.round(width * 0.026))}px Arial`
+      shoes.forEach((component, index) => {
+        const touchingBlue = touchIndexes(component, bodyCandidates, 0.08)
+        const label = touchingBlue.length ? `S${index + 1} SHOE / HAND-FOOT` : `S${index + 1} DISPLAY`
+        control.fillText(label, component.minX + 8, component.minY + 8)
+      })
+      control.font = `bold ${Math.max(12, Math.round(width * 0.019))}px Arial`
+      bodyCandidates.forEach((component, index) => {
+        control.fillText(`B${index + 1} ${blueClassifications[index]?.kind || 'HAND'}`, component.minX + 8, component.minY + 8)
+      })
+      clothes.forEach((component, index) => {
+        control.fillText(`R${index + 1} CLOTHING`, component.minX + 8, component.minY + 8)
+      })
+      const blob = await canvasToBlob(controlCanvas, 'image/png')
+      if (!blob) return null
+      const fileName = file.name.replace(/\.[^.]+$/, '') || 'uploaded-angle-hand'
+      const controlFile = new File([blob], `${fileName}-hand-control.png`, { type: 'image/png' })
+      const shoeLines = shoes.map((component, index) => {
+        const box = metrics(component)
+        const axis = axisForComponent(masks.yellow, component)
+        const touchingBlue = touchIndexes(component, bodyCandidates, 0.08).map((blueIndex) => `B${blueIndex + 1}`)
+        return `S${index + 1}: shoe/yellow region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingBlue=${touchingBlue.length ? touchingBlue.join('/') : 'none'}. Yellow controls product shoe placement/angle/scale/occlusion only; product shoe appearance comes only from uploaded product shoe.`
+      })
+      const bodyLines = bodyCandidates.map((component, index) => {
+        const box = metrics(component)
+        const axis = axisForComponent(masks.blue, component)
+        const touchingShoes = touchIndexes(component, shoes, 0.08).map((shoeIndex) => `S${shoeIndex + 1}`)
+        const touchingRed = touchIndexes(component, clothes, 0.08).map((redIndex) => `R${redIndex + 1}`)
+        const classification = blueClassifications[index]
+        return `B${index + 1}: ${classification?.kind || 'HAND'} by code, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingShoes=${touchingShoes.length ? touchingShoes.join('/') : 'none'}, touchingClothing=${touchingRed.length ? touchingRed.join('/') : 'none'}, classificationReason=${classification?.reason || 'none'}. Generate this B region as ${classification?.kind === 'FOOT/LEG' ? 'leg/foot/ankle' : 'hand/fingers/wrist'}; do not reinterpret it as the other body part.`
+      })
+      const clothingLines = clothes.map((component, index) => {
+        const box = metrics(component)
+        return `R${index + 1}: clothing/red region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%). Red controls only lower-body clothing support from model reference.`
+      })
+      const layout = [
+        'HAND ANGLE CONTROL HARD CONSTRAINT:',
+        'This is the dedicated code-generated control for the upload channel "angle reference with hands". It does not use the normal angle-reference code logic or normal angle-reference prompt.',
+        'Color meaning: yellow/S = product shoe placement/angle/scale/occlusion; blue/B = code-classified HAND or FOOT/LEG; red/R = clothing support; black/empty = background.',
+        'Coordinate hard-lock: treat this hand-angle control as a fixed X0-X100 / Y0-Y100 canvas. Every S/B/R bbox left/top/width/height/center is mandatory. Do not recenter, rebalance, beautify, flip, straighten, or move objects into a generic commercial pose. The original uploaded angle image and aesthetic wording only verify the layout; they must not override the numeric S/B/R coordinates.',
+        'Blue rule for this hand-angle channel: each B region is given a definite code classification, HAND or FOOT/LEG, from the blue contour and its contact with yellow shoes/red clothing. Follow the B classification exactly; do not reinterpret HAND as leg or FOOT/LEG as hand.',
+        'Hand-supported shoe rule: a yellow shoe touched by a blue hand candidate may be handheld or hand-supported display shoe; it must not automatically become worn-on-foot. A yellow shoe worn by blue foot/ankle/lower-leg candidate becomes worn shoe.',
+        `mainShoeObjectCount = ${shoes.length}`,
+        `blueHandCount = ${blueClassifications.filter((item) => item.kind === 'HAND').length}`,
+        `blueFootLegCount = ${blueClassifications.filter((item) => item.kind === 'FOOT/LEG').length}`,
+        `redClothingRegionCount = ${clothes.length}`,
+        clothes.length === 0 ? 'No red/R clothing region is detected in this hand-angle control. Do not generate clothing, garment, skirt hem, pants hem, sleeve, fabric panel, torso, or outfit area. Show only the shoes and the code-classified hands/feet/legs required by the S/B layout.' : '',
+        shoeLines.length ? 'SHOE/YELLOW MAP:\n' + shoeLines.join('\n') : 'SHOE/YELLOW MAP: none detected.',
+        bodyLines.length ? 'BLUE HAND-OR-LEG CANDIDATE MAP:\n' + bodyLines.join('\n') : 'BLUE HAND-OR-LEG CANDIDATE MAP: none detected.',
+        clothingLines.length ? 'RED CLOTHING MAP:\n' + clothingLines.join('\n') : 'RED CLOTHING MAP: none detected.',
+        'Final image must not show labels, grid, gray guide fills, white boxes, or yellow/blue/red/black mask colors. Replace every region with realistic photographic content from the assigned references.',
+      ].join('\n')
       return { file: controlFile, layout }
     } catch {
       return null
@@ -2587,6 +4156,7 @@ function App() {
       background: { maxSide: 1400, quality: 0.84, type: 'image/jpeg' },
       model: { maxSide: 1400, quality: 0.84, type: 'image/jpeg' },
       angle: { maxSide: 768, quality: 0.92, type: 'image/png' },
+      angleHand: { maxSide: 768, quality: 0.92, type: 'image/png' },
     }[role]
     try {
       const bitmap = await createImageBitmap(file)
@@ -2652,17 +4222,28 @@ function App() {
     if (!skill) return
     const productFile = (mergeImageFiles.product || [])[0]
     const backgroundFile = (mergeImageFiles.background || [])[0]
-    const uploadedAngleFiles = (mergeImageFiles.angle || []).slice(0, mergeAngleBatchLimit)
+    const uploadedAngleItems = [
+      ...(mergeImageFiles.angle || []).map((file, index) => ({
+        file,
+        source: 'standard' as const,
+        label: (mergeImageFiles.angle || []).length > 1 ? `上传角度参考图 ${index + 1}` : '上传角度参考图',
+      })),
+      ...(mergeImageFiles.angleHand || []).map((file, index) => ({
+        file,
+        source: 'hand' as const,
+        label: (mergeImageFiles.angleHand || []).length > 1 ? `角度参考图（含手） ${index + 1}` : '角度参考图（含手）',
+      })),
+    ].slice(0, mergeAngleBatchLimit)
     const modelFile = (mergeImageFiles.model || [])[0]
     const selectedLibraryAngles = selectedMergeAngleIds
       .map((id) => mergeAngleLibrary.find((item) => item.id === id))
       .filter((item): item is (typeof mergeAngleLibrary)[number] => Boolean(item))
       .slice(0, mergeAngleBatchLimit)
-    if (!productFile || !backgroundFile || (uploadedAngleFiles.length === 0 && selectedLibraryAngles.length === 0)) {
+    if (!productFile || !backgroundFile || (uploadedAngleItems.length === 0 && selectedLibraryAngles.length === 0)) {
       setError('请上传产品鞋图、背景图，并上传或选择一个角度参考图。')
       return
     }
-    if (uploadedAngleFiles.length === 0 && selectedMergeAngleIds.length > mergeAngleBatchLimit) {
+    if (uploadedAngleItems.length === 0 && selectedMergeAngleIds.length > mergeAngleBatchLimit) {
       setError(`一次最多选择 ${mergeAngleBatchLimit} 个角度生成。`)
       return
     }
@@ -2679,9 +4260,21 @@ function App() {
     setImageResult(null)
     setImageResults([])
     setUploadedFiles([])
-    const generationAngles = uploadedAngleFiles.length > 0
-      ? uploadedAngleFiles.map((file, index) => ({ id: `uploaded-angle-${index + 1}`, label: uploadedAngleFiles.length > 1 ? `上传角度参考图 ${index + 1}` : '上传角度参考图', url: '', uploadedFile: file }))
-      : selectedLibraryAngles.map((item) => ({ ...item, uploadedFile: null as File | null }))
+    const generationAngles: Array<{
+      id: string
+      label: string
+      url: string
+      uploadedFile: File | null
+      uploadedAngleKind?: 'standard' | 'hand'
+    }> = uploadedAngleItems.length > 0
+      ? uploadedAngleItems.map((item, index) => ({
+          id: item.source === 'hand' ? `uploaded-angle-hand-${index + 1}` : `uploaded-angle-${index + 1}`,
+          label: item.label,
+          url: '',
+          uploadedFile: item.file,
+          uploadedAngleKind: item.source,
+        }))
+      : selectedLibraryAngles.map((item) => ({ id: item.id, label: item.label, url: item.url, uploadedFile: null }))
     setPendingPreviewCards(generationAngles.map((item) => ({ id: item.id, title: `${item.label} 生图中` })))
     try {
       const sharedFiles = [
@@ -2693,22 +4286,45 @@ function App() {
       let lastGenerated: ImageResult | null = null
       for (const angleItem of generationAngles) {
         const angleFile = angleItem.uploadedFile || await fileFromAsset(angleItem.url, `${angleItem.id}.png`)
-        const cleanedAngleControl = angleItem.uploadedFile ? await buildCleanedAngleControl(angleFile) : null
+        const isHandAngleUpload = angleItem.uploadedFile && angleItem.uploadedAngleKind === 'hand'
+        const useHandAngleControl = Boolean(isHandAngleUpload)
+        const cleanedAngleControl = angleItem.uploadedFile
+          ? useHandAngleControl
+            ? await buildHandAngleControl(angleFile)
+            : isHandAngleUpload
+              ? null
+              : await buildCleanedAngleControl(angleFile)
+          : null
+        const uploadedAngleIsRealPhoto = Boolean(angleItem.uploadedFile && cleanedAngleControl && !cleanedAngleControl.file)
         const angleLayoutBrief = angleItem.uploadedFile
-          ? [cleanedAngleControl?.layout, await describeAngleColorBlocks(angleFile, 'uploaded angle reference')].filter(Boolean).join('\n\n')
+          ? [cleanedAngleControl?.layout].filter(Boolean).join('\n\n')
           : await describeAngleColorBlocks(angleFile, `${angleItem.label} / ${angleItem.id}`)
         const uploadedAngleSmartAnalysis = ''
         const uploadedAnglePrompt = angleItem.uploadedFile
-          ? buildUploadedAngleGenerationPrompt(uploadedAngleSmartAnalysis)
+          ? buildUploadedAngleGenerationPrompt([
+              uploadedAngleIsRealPhoto ? 'REAL PHOTO ANGLE REFERENCE' : '',
+              useHandAngleControl ? 'USER UPLOADED ANGLE REFERENCE WITH HANDS: use the dedicated hand-angle control image and hand-angle layout text for this channel. Yellow/S regions are shoes, red/R regions are clothing, and every blue/B region has a definite code classification: HAND or FOOT/LEG. Follow that classification exactly. A HAND touching or holding a shoe makes that shoe hand-held or hand-supported, not automatically worn. A FOOT/LEG entering or wearing a shoe makes that shoe worn.' : '',
+              uploadedAngleSmartAnalysis,
+            ].filter(Boolean).join('\n'))
           : ''
         const prompt = [
-          mergeImageStrictReferenceLogic,
-          angleItem.uploadedFile ? uploadedAnglePrompt : `Selected angle-library template: ${angleItem.label} (${angleItem.id}.png). This merge-angle image is the only pose/composition/semantic-mask template for this generation.`,
+          angleItem.uploadedFile ? '' : mergeImageStrictReferenceLogic,
+          angleItem.uploadedFile
+            ? uploadedAnglePrompt
+            : `Selected angle-library template: ${angleItem.label} (${angleItem.id}.png). This merge-angle image is the only pose/composition/semantic-mask template for this generation.`,
           angleItem.uploadedFile ? '' : mergeAnglePosePrompts[angleItem.id],
-          modelFile ? 'A model reference image is uploaded. Use the model reference only for actual outfit category/color/fabric, clothing material, body-limb appearance, skin tone where visible, lower-body proportion, and elegant styling as secondary support for the product shoes. Put this outfit into red regions and the matching natural body parts into blue regions after identifying each blue silhouette as leg/ankle/foot or arm/hand/wrist, but do not let clothing become the main subject. Do not copy model shoes, model background, wall, floor, props, basket, flowers, watermark, or lighting pattern.' : 'No model reference image is uploaded. Generate simple natural body limbs/clothing only as required by the angle mask.',
+          modelFile ? 'A model reference image is uploaded. Use it only for outfit category/color/fabric, body-limb appearance, skin tone, lower-body proportion, and elegant styling as secondary support for the product shoes. Do not copy model shoes, model background, wall, floor, props, basket, flowers, watermark, or lighting pattern.' : 'No model reference image is uploaded. Generate simple natural body limbs/clothing only as required by the angle reference.',
           'Lower-body-only framing: never generate the model face, head, portrait, or full upper body. Keep the crop focused on shoes, feet, legs, hands if present in the angle mask, and only the clothing portion required around the lower body.',
-          'The angle mask must dominate pose and shoe layout: shoe count, shoe placement, shoe direction, toe direction, heel direction, shoe angle, inferred body-facing direction, foot/leg/hand/arm pose, camera angle, scale relationship, and occlusion must follow the selected angle mask rather than the product photo or model photo. Once the body-facing direction is inferred from the angle reference, keep that direction fixed and do not generate a different facing direction. If the angle reference shows shoes facing left, right, toward camera, or away from camera, the generated shoes and body must keep exactly that same direction.',
-          'The product shoe image must dominate shoe identity: redraw the exact uploaded product shoe according to the yellow placement/angle reference regions. Yellow only controls shoe placement, angle, size, toe direction, heel position, perspective, and whether it is worn or displayed; yellow and the angle-library image never control shoe exterior appearance, silhouette, color, material, shape, style, sole, heel, toe, straps, buckles, laces, or details. The final shoe must match the uploaded product shoe image 100%. Yellow regions connected to blue leg/ankle/foot regions are worn shoes; yellow regions not connected to blue limbs are ground or foreground display shoes only, and must not create extra legs or feet.',
+          isHandAngleUpload
+            ? 'The dedicated hand-angle control image plus hand-angle layout text must dominate pose and camera: yellow/S controls shoe placement and role; blue/B has a definite code classification as HAND or FOOT/LEG from contour/contact; red/R controls clothing. Follow each B classification exactly and do not use the normal angle-reference code logic or normal angle-reference prompt rules for this hand-angle channel.'
+            : uploadedAngleIsRealPhoto
+            ? 'The uploaded real angle photo must dominate pose and camera: shoe count, shoe placement, shoe direction, toe direction, heel direction, shoe angle, body-facing direction, foot/leg/hand/arm pose, camera height, lens perspective, scale relationship, crop, overlap, and occlusion must follow the real angle photo rather than the product photo or model photo. Do not convert it into a color-block mask workflow.'
+            : 'The angle mask plus code-generated structure analysis must dominate pose and shoe layout: shoe count, shoe placement, shoe direction, toe direction, heel direction, body-facing direction, hand/foot candidate roles, shoe-limb bindings, depth ordering, camera angle, scale relationship, and occlusion must follow the angle reference rather than the product photo or model photo.',
+          isHandAngleUpload
+            ? 'The product shoe image must dominate shoe identity: replace every yellow/S shoe in the hand-angle control with the exact uploaded product shoe while preserving shoe placement, angle, size, toe direction, heel direction, perspective, worn/display/hand-supported role, hand/foot relationship, and occlusion. The final shoe must match the uploaded product shoe image 100%.'
+            : uploadedAngleIsRealPhoto
+            ? 'The product shoe image must dominate shoe identity: replace the shoe identity in the real angle photo with the exact uploaded product shoe while preserving the real photo shoe placement, angle, size, toe direction, heel direction, perspective, worn/display role, hand/foot relationship, and occlusion. The final shoe must match the uploaded product shoe image 100%.'
+            : 'The product shoe image must dominate shoe identity: redraw the exact uploaded product shoe according to the S/yellow placement and angle reference objects. Yellow/S objects only control shoe placement, angle, size, toe direction, heel position, perspective, and worn/display role; they never control shoe exterior appearance, silhouette, color, material, shape, style, sole, heel, toe, straps, buckles, laces, or details. The final shoe must match the uploaded product shoe image 100%.',
           'The background image must dominate environment: use its wall, floor, baseboard, lighting direction, color temperature, and soft shadows. Do not use the model reference background.',
           userDemand ? 'Secondary user text demand, obey only when it does not conflict with the angle mask, model reference, product shoe lock, or background lock: ' + userDemand : '',
         ].filter(Boolean).join('\n')
@@ -2717,13 +4333,13 @@ function App() {
         generateForm.append('brief', effectiveBrief)
         generateForm.append('prompt', prompt)
         generateForm.append('size', outputSize)
-        generateForm.append('angleSource', angleItem.uploadedFile ? 'User uploaded angle reference' : `${angleItem.label} / ${angleItem.id}`)
+        generateForm.append('angleSource', angleItem.uploadedFile ? (uploadedAngleIsRealPhoto ? 'User uploaded real photo angle reference' : (angleItem.uploadedAngleKind === 'hand' ? 'User uploaded semantic color-block angle reference with hands' : 'User uploaded semantic color-block angle reference')) : `${angleItem.label} / ${angleItem.id}`)
         generateForm.append('angleLayout', angleLayoutBrief)
         sharedFiles.forEach(({ image, name }) => generateForm.append('images', image, name))
         if (cleanedAngleControl?.file) {
           generateForm.append('images', cleanedAngleControl.file, `merge-angle-control-${cleanedAngleControl.file.name}`)
         }
-        generateForm.append('images', await compressMergeReferenceFile(angleFile, 'angle'), `merge-angle-${angleFile.name}`)
+        generateForm.append('images', await compressMergeReferenceFile(angleFile, 'angle'), `${angleItem.uploadedAngleKind === 'hand' ? 'merge-angle-hand' : 'merge-angle'}-${angleFile.name}`)
         const generateResponse = await fetch('/api/run/merge-image-generate', {
           method: 'POST',
           body: generateForm,
@@ -2737,7 +4353,7 @@ function App() {
           directionId: angleItem.id,
           imageUrl: generated.imageUrl,
           svgUrl: generated.svgUrl || '',
-          title: angleItem.uploadedFile ? '上传角度参考图' : angleItem.label,
+          title: angleItem.uploadedFile ? angleItem.label : angleItem.label,
           size: outputSize,
         })
         setImageResults([...generatedImages])
@@ -4367,7 +5983,7 @@ function App() {
                                   <input
                                     type="file"
                                     accept="image/*"
-                                    multiple={slot.id === 'angle'}
+                                    multiple={slot.id === 'angle' || slot.id === 'angleHand'}
                                     onChange={(event) => {
                                       selectMergeImage(slot.id, event.currentTarget.files)
                                       event.currentTarget.value = ''
@@ -4377,11 +5993,11 @@ function App() {
                                 {slotFiles.length > 0 && (
                                   <button
                                     type="button"
-                                    className={`slot-preview ${slot.id === 'angle' && slotFiles.length > 1 ? 'slot-preview-stack' : ''}`}
+                                    className={`slot-preview ${(slot.id === 'angle' || slot.id === 'angleHand') && slotFiles.length > 1 ? 'slot-preview-stack' : ''}`}
                                     onClick={() => {
-                                      if (slot.id === 'angle' && slotFiles.length > 1) setMergeReferenceModalSlot('angle')
+                                      if ((slot.id === 'angle' || slot.id === 'angleHand') && slotFiles.length > 1) setMergeReferenceModalSlot(slot.id)
                                     }}
-                                    aria-label={slot.id === 'angle' && slotFiles.length > 1 ? '查看全部角度参考图' : `${slot.label}预览`}
+                                    aria-label={(slot.id === 'angle' || slot.id === 'angleHand') && slotFiles.length > 1 ? `查看全部${slot.label}` : `${slot.label}预览`}
                                   >
                                     {slotFiles.map((file, index) => (
                                       <figure className="slot-preview-item" key={`${file.name}-${index}`}>
@@ -4389,7 +6005,7 @@ function App() {
                                           src={mergeImagePreviewUrls[`${slot.id}-${index}`]}
                                           alt={`${slot.label}预览 ${index + 1}`}
                                         />
-                                        {(slot.id !== 'angle' || slotFiles.length === 1) && (
+                                        {((slot.id !== 'angle' && slot.id !== 'angleHand') || slotFiles.length === 1) && (
                                           <span
                                             className="slot-preview-remove"
                                             role="button"
@@ -4413,7 +6029,7 @@ function App() {
                                         )}
                                       </figure>
                                     ))}
-                                    {slot.id === 'angle' && slotFiles.length > 1 && <span className="slot-preview-count">{slotFiles.length}</span>}
+                                    {(slot.id === 'angle' || slot.id === 'angleHand') && slotFiles.length > 1 && <span className="slot-preview-count">{slotFiles.length}</span>}
                                   </button>
                                 )}
                               </section>
@@ -5720,49 +7336,49 @@ function App() {
         </div>
       )}
 
-      {mergeReferenceModalSlot === 'angle' && (
+      {mergeReferenceModalSlot && (
         <div className="merge-reference-modal-backdrop" role="presentation" onClick={() => setMergeReferenceModalSlot('')}>
-          <section className="merge-reference-modal" role="dialog" aria-modal="true" aria-label="角度参考图管理" onClick={(event) => event.stopPropagation()}>
+          <section className="merge-reference-modal" role="dialog" aria-modal="true" aria-label={`${mergeReferenceModalSlot === 'angleHand' ? '角度参考图（含手）' : '角度参考图'}管理`} onClick={(event) => event.stopPropagation()}>
             <header>
               <div>
-                <strong>角度参考图</strong>
-                <span>{(mergeImageFiles.angle || []).length} 张参考图，将共用产品鞋图、背景图和模特参考图分别生成。</span>
+                <strong>{mergeReferenceModalSlot === 'angleHand' ? '角度参考图（含手）' : '角度参考图'}</strong>
+                <span>{(mergeImageFiles[mergeReferenceModalSlot] || []).length} 张参考图，将共用产品鞋图、背景图和模特参考图分别生成。</span>
               </div>
               <button type="button" aria-label="关闭" onClick={() => setMergeReferenceModalSlot('')}>
                 ×
               </button>
             </header>
             <div className="merge-reference-modal-grid">
-              {(mergeImageFiles.angle || []).map((file, index) => (
+              {(mergeImageFiles[mergeReferenceModalSlot] || []).map((file, index) => (
                 <figure key={`${file.name}-${index}`}>
-                  <img src={mergeImagePreviewUrls[`angle-${index}`]} alt={`角度参考图 ${index + 1}`} />
-                  <button type="button" onClick={() => removeMergeImage('angle', index)}>
+                  <img src={mergeImagePreviewUrls[`${mergeReferenceModalSlot}-${index}`]} alt={`${mergeReferenceModalSlot === 'angleHand' ? '角度参考图（含手）' : '角度参考图'} ${index + 1}`} />
+                  <button type="button" onClick={() => removeMergeImage(mergeReferenceModalSlot, index)}>
                     ×
                   </button>
-                  <figcaption>角度 {index + 1}</figcaption>
+                  <figcaption>{mergeReferenceModalSlot === 'angleHand' ? '含手角度' : '角度'} {index + 1}</figcaption>
                 </figure>
               ))}
-              {(mergeImageFiles.angle || []).length < mergeAngleBatchLimit && (
+              {(mergeImageFiles[mergeReferenceModalSlot] || []).length < mergeAngleBatchLimit && (
                 <label
-                  className={`merge-reference-add ${draggingMergeImageSlot === 'angle-modal' ? 'drag-over' : ''}`}
-                  onDragEnter={(event) => handleMergeImageDragOver(event, 'angle-modal')}
-                  onDragOver={(event) => handleMergeImageDragOver(event, 'angle-modal')}
-                  onDragLeave={(event) => handleMergeImageDragLeave(event, 'angle-modal')}
+                  className={`merge-reference-add ${draggingMergeImageSlot === `${mergeReferenceModalSlot}-modal` ? 'drag-over' : ''}`}
+                  onDragEnter={(event) => handleMergeImageDragOver(event, `${mergeReferenceModalSlot}-modal`)}
+                  onDragOver={(event) => handleMergeImageDragOver(event, `${mergeReferenceModalSlot}-modal`)}
+                  onDragLeave={(event) => handleMergeImageDragLeave(event, `${mergeReferenceModalSlot}-modal`)}
                   onDrop={(event) => {
                     event.preventDefault()
                     setDraggingMergeImageSlot('')
-                    selectMergeImage('angle', event.dataTransfer.files)
+                    selectMergeImage(mergeReferenceModalSlot, event.dataTransfer.files)
                   }}
                 >
                   <span className="slot-plus" aria-hidden="true" />
-                  <strong>添加角度图</strong>
+                  <strong>{mergeReferenceModalSlot === 'angleHand' ? '添加含手角度图' : '添加角度图'}</strong>
                   <small>点击上传或拖入图片</small>
                   <input
                     type="file"
                     accept="image/*"
                     multiple
                     onChange={(event) => {
-                      selectMergeImage('angle', event.currentTarget.files)
+                      selectMergeImage(mergeReferenceModalSlot, event.currentTarget.files)
                       event.currentTarget.value = ''
                     }}
                   />
@@ -5886,3 +7502,4 @@ function App() {
 }
 
 export default App
+

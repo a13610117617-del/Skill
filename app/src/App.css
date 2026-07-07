@@ -4839,6 +4839,28 @@ button:disabled {
   background: transparent;
 }
 
+.project-reference-preview {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  outline: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.project-reference-preview:hover img,
+.project-reference-preview:focus-visible img {
+  border-color: rgba(247, 251, 253, 0.34);
+  filter: brightness(1.08);
+}
+
+.project-reference-preview:focus-visible {
+  box-shadow: 0 0 0 2px rgba(247, 251, 253, 0.26);
+}
+
 .project-reference-strip img {
   display: block;
   width: 100%;
@@ -4847,6 +4869,7 @@ button:disabled {
   border: 1px solid rgba(232, 238, 242, 0.1);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.18);
+  transition: border-color 160ms ease, filter 160ms ease;
 }
 
 .project-reference-strip figcaption {
