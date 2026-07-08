@@ -1927,6 +1927,7 @@ function App() {
       const masks = {
         yellow: new Uint8Array(width * height),
         blue: new Uint8Array(width * height),
+        green: new Uint8Array(width * height),
         red: new Uint8Array(width * height),
         black: new Uint8Array(width * height),
       }
@@ -2388,43 +2389,6 @@ function App() {
         }
         return deduped
       }
-      const absorbShoeDetailsIntoMainShoes = (components: AngleComponent[]) => {
-        const sorted = components.slice().sort((a, b) => b.count - a.count)
-        const mainShoes: AngleComponent[] = []
-        const detailFragments: AngleComponent[] = []
-        for (const component of sorted) {
-          const area = componentAreaRatio(component)
-          const boxArea = boxAreaRatio(component)
-          const boxWidth = component.maxX - component.minX + 1
-          const boxHeight = component.maxY - component.minY + 1
-          const mainLike =
-            area >= 0.014 ||
-            boxArea >= 0.072 ||
-            (boxWidth >= width * 0.18 && boxHeight >= height * 0.1)
-          if (mainLike) mainShoes.push(component)
-          else detailFragments.push(component)
-        }
-        if (!mainShoes.length) return sorted
-        for (const fragment of detailFragments) {
-          let bestIndex = -1
-          let bestScore = 0
-          for (let index = 0; index < mainShoes.length; index += 1) {
-            const main = mainShoes[index]
-            const overlap = boxOverlapRatio(expandBox(fragment, 0.22), expandBox(main, 0.12))
-            const close = boxCenterDistance(fragment, main)
-            const fragmentInsideMainNeighborhood = boxesOverlap(expandBox(fragment, 0.18), expandBox(main, 0.18))
-            const score = overlap * 4 + (fragmentInsideMainNeighborhood ? 1.4 : 0) + Math.max(0, 0.32 - close)
-            if (score > bestScore) {
-              bestScore = score
-              bestIndex = index
-            }
-          }
-          if (bestIndex >= 0 && bestScore >= 1.15) {
-            mainShoes[bestIndex] = unionBox(mainShoes[bestIndex], fragment)
-          }
-        }
-        return mainShoes.sort((a, b) => b.count - a.count)
-      }
       const mergeShoeFragments = (components: AngleComponent[]) => {
         const candidates = components.filter((component) => {
           const boxWidth = component.maxX - component.minX + 1
@@ -2449,7 +2413,7 @@ function App() {
           if (!mergedIntoExisting && !isTinyDetail) merged.push(component)
         }
         const split = merged.flatMap(splitOverlappedDoubleShoe)
-        const supplemented = absorbShoeDetailsIntoMainShoes(dedupeShoes([...split, ...inferWornShoeSupplements(components, split)]))
+        const supplemented = dedupeShoes([...split, ...inferWornShoeSupplements(components, split)])
         const connected = supplemented.filter((component) => connectedToAny(component, blueComponents, 0.1))
         const disconnected = supplemented.filter((component) => !connectedToAny(component, blueComponents, 0.1))
         const chosen = [...connected, ...disconnected]
@@ -3043,14 +3007,11 @@ function App() {
             const overlap = boxOverlapRatio(expandBox(limb, 0.05), expandBox(component, 0.04))
             const limbBox = metrics(limb)
             const shoeBox = metrics(component)
-            const limbArea = componentAreaRatio(limb)
             const lowerLimbNearShoe = limbBox.centerY < shoeBox.centerY + shoeBox.boxHeight * 0.45 && limbBox.centerY > shoeBox.top - 28
-            const largeFootAnchor = limbArea > 0.012 || limbBox.boxWidth > 18 || limbBox.boxHeight > 18
-            return { limb, contact, overlap, limbBox, lowerLimbNearShoe, largeFootAnchor }
+            return { limb, contact, overlap, limbBox, lowerLimbNearShoe }
           })
-          .filter(({ contact, overlap, lowerLimbNearShoe, largeFootAnchor }) =>
+          .filter(({ contact, overlap, lowerLimbNearShoe }) =>
             lowerLimbNearShoe &&
-            largeFootAnchor &&
             (contact.contactPixels >= 8 || contact.ratio >= 0.0025 || overlap > 0.025),
           )
           .sort((a, b) => a.limbBox.centerX - b.limbBox.centerX)
@@ -3060,8 +3021,7 @@ function App() {
         const boxHeight = component.maxY - component.minY + 1
         const wideEnoughForPair = boxWidth > width * 0.26 && boxHeight > height * 0.08
         const anchorSpread = footAnchors[footAnchors.length - 1].limbBox.centerX - footAnchors[0].limbBox.centerX
-        const anchorYSpread = Math.abs(footAnchors[footAnchors.length - 1].limbBox.centerY - footAnchors[0].limbBox.centerY)
-        if (!wideEnoughForPair || anchorSpread < 24 || anchorYSpread < 8) return [component]
+        if (!wideEnoughForPair || anchorSpread < 16) return [component]
 
         const splitXs = footAnchors.slice(0, -1).map((anchor, index) => {
           const next = footAnchors[index + 1]
@@ -3291,7 +3251,7 @@ function App() {
           return boxOverlapRatio(expandBox(component, 0.025), expandBox(shoe, 0.015)) > 0.62 ||
             boxesOverlap(expandBox(component, 0.04), expandBox(shoe, 0.01))
         })
-        const separatedPartCount = absorbShoeDetailsIntoMainShoes(dedupeShoes(nestedRawParts))
+        const separatedPartCount = dedupeShoes(nestedRawParts)
           .filter((component) => componentAreaRatio(component) > 0.004 || boxAreaRatio(component) > 0.026)
           .length
         const connectedLegs = blueRegionAnalysis.filter((region) => region.kind === 'leg-foot' && region.connectedShoeIndexes.includes(shoeIndex)).length
@@ -3308,7 +3268,7 @@ function App() {
           (connectedLegs >= 2 || (largePairBox && box.boxWidth >= 38 && box.boxHeight >= 32))
         const inferred = Math.max(
           1,
-          separatedPartCount >= 2 && (largePairBox || veryWideDisplay || wornPairBox) ? separatedPartCount : 1,
+          separatedPartCount,
           veryWideDisplay || wornPairBox ? 2 : 1,
         )
         return Math.min(2, inferred)
@@ -3664,6 +3624,7 @@ function App() {
       const masks = {
         yellow: new Uint8Array(width * height),
         blue: new Uint8Array(width * height),
+        green: new Uint8Array(width * height),
         red: new Uint8Array(width * height),
         black: new Uint8Array(width * height),
       }
@@ -3675,6 +3636,7 @@ function App() {
         const a = pixels[offset + 3]
         if (a < 24) continue
         if (r > 150 && g > 125 && b < 135 && r + g > b * 2 + 110) masks.yellow[index] = 1
+        else if (g > 105 && r < 150 && b < 150 && g > r * 1.15 && g > b * 1.15) masks.green[index] = 1
         else if (b > 110 && r < 135 && g < 170 && b > r * 1.15 && b > g * 1.05) masks.blue[index] = 1
         else if (r > 135 && g < 130 && b < 130 && r > g * 1.2 && r > b * 1.2) masks.red[index] = 1
         else if (r < 55 && g < 55 && b < 55) masks.black[index] = 1
@@ -3801,207 +3763,12 @@ function App() {
       }
       const boxesOverlap = (a: HandAngleComponent, b: HandAngleComponent) =>
         a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY
-      const intersectionArea = (a: HandAngleComponent, b: HandAngleComponent) => {
-        const left = Math.max(a.minX, b.minX)
-        const top = Math.max(a.minY, b.minY)
-        const right = Math.min(a.maxX, b.maxX)
-        const bottom = Math.min(a.maxY, b.maxY)
-        if (right < left || bottom < top) return 0
-        return (right - left + 1) * (bottom - top + 1)
-      }
-      const boxArea = (component: HandAngleComponent) =>
-        Math.max(1, (component.maxX - component.minX + 1) * (component.maxY - component.minY + 1))
-      const centerInsideBox = (inner: HandAngleComponent, outer: HandAngleComponent, paddingRatio = 0) => {
-        const expanded = expandBox(outer, paddingRatio)
-        const centerX = (inner.minX + inner.maxX) / 2
-        const centerY = (inner.minY + inner.maxY) / 2
-        return centerX >= expanded.minX && centerX <= expanded.maxX && centerY >= expanded.minY && centerY <= expanded.maxY
-      }
       const touchIndexes = (component: HandAngleComponent, others: HandAngleComponent[], ratio = 0.08) => {
         const expanded = expandBox(component, ratio)
         return others
           .map((other, index) => ({ other, index }))
           .filter(({ other }) => boxesOverlap(expanded, expandBox(other, ratio)))
           .map(({ index }) => index)
-      }
-      const analyzeBlueContour = (component: HandAngleComponent) => {
-        const componentWidth = component.maxX - component.minX + 1
-        const componentHeight = component.maxY - component.minY + 1
-        const bboxArea = boxArea(component)
-        const fillRatio = component.count / bboxArea
-        let maxRowRuns = 0
-        let maxColRuns = 0
-        let splitRows = 0
-        let splitCols = 0
-        let terminalSplitRows = 0
-        let terminalSplitCols = 0
-        const rowWidths: number[] = []
-        const colHeights: number[] = []
-        const rowTerminal = Math.max(2, Math.round(componentHeight * 0.24))
-        const colTerminal = Math.max(2, Math.round(componentWidth * 0.24))
-        for (let y = component.minY; y <= component.maxY; y += 1) {
-          let runs = 0
-          let inRun = false
-          let pixelsInRow = 0
-          for (let x = component.minX; x <= component.maxX; x += 1) {
-            const active = Boolean(masks.blue[y * width + x])
-            if (active) {
-              pixelsInRow += 1
-              if (!inRun) runs += 1
-              inRun = true
-            } else {
-              inRun = false
-            }
-          }
-          if (pixelsInRow > 0) rowWidths.push(pixelsInRow)
-          maxRowRuns = Math.max(maxRowRuns, runs)
-          if (runs >= 2) {
-            splitRows += 1
-            if (y <= component.minY + rowTerminal || y >= component.maxY - rowTerminal) terminalSplitRows += 1
-          }
-        }
-        for (let x = component.minX; x <= component.maxX; x += 1) {
-          let runs = 0
-          let inRun = false
-          let pixelsInCol = 0
-          for (let y = component.minY; y <= component.maxY; y += 1) {
-            const active = Boolean(masks.blue[y * width + x])
-            if (active) {
-              pixelsInCol += 1
-              if (!inRun) runs += 1
-              inRun = true
-            } else {
-              inRun = false
-            }
-          }
-          if (pixelsInCol > 0) colHeights.push(pixelsInCol)
-          maxColRuns = Math.max(maxColRuns, runs)
-          if (runs >= 2) {
-            splitCols += 1
-            if (x <= component.minX + colTerminal || x >= component.maxX - colTerminal) terminalSplitCols += 1
-          }
-        }
-        const averageRowWidth = rowWidths.reduce((sum, value) => sum + value, 0) / Math.max(1, rowWidths.length)
-        const maxRowWidth = Math.max(...rowWidths, 0)
-        const minUsefulRowWidth = Math.min(...rowWidths.filter((value) => value >= averageRowWidth * 0.35), maxRowWidth || 1)
-        const averageColHeight = colHeights.reduce((sum, value) => sum + value, 0) / Math.max(1, colHeights.length)
-        const maxColHeight = Math.max(...colHeights, 0)
-        const minUsefulColHeight = Math.min(...colHeights.filter((value) => value >= averageColHeight * 0.35), maxColHeight || 1)
-        const widthVariation = maxRowWidth / Math.max(1, minUsefulRowWidth)
-        const heightVariation = maxColHeight / Math.max(1, minUsefulColHeight)
-        const manyFingerSplits =
-          maxRowRuns >= 3 ||
-          maxColRuns >= 3 ||
-          terminalSplitRows >= 2 ||
-          terminalSplitCols >= 2 ||
-          splitRows >= Math.max(3, componentHeight * 0.08) ||
-          splitCols >= Math.max(3, componentWidth * 0.08)
-        const narrowProngShape =
-          (widthVariation >= 2.6 || heightVariation >= 2.6) &&
-          (fillRatio < 0.58 || componentWidth <= width * 0.18 || componentHeight <= height * 0.28)
-        const fingerContourLock = manyFingerSplits || narrowProngShape
-        const ankleLimbLock =
-          !fingerContourLock &&
-          fillRatio >= 0.34 &&
-          Math.max(componentWidth, componentHeight) / Math.max(1, Math.min(componentWidth, componentHeight)) >= 1.65 &&
-          maxRowRuns <= 2 &&
-          maxColRuns <= 2 &&
-          splitRows <= Math.max(2, componentHeight * 0.06) &&
-          splitCols <= Math.max(2, componentWidth * 0.06)
-        return {
-          fingerContourLock,
-          ankleLimbLock,
-          maxRowRuns,
-          maxColRuns,
-          splitRows,
-          splitCols,
-          terminalSplitRows,
-          terminalSplitCols,
-          widthVariation,
-          heightVariation,
-        }
-      }
-      const classifyBlue = (component: HandAngleComponent, shoeIndexes: number[], clothingIndexes: number[]) => {
-        const box = metrics(component)
-        const bboxArea = boxArea(component)
-        const fillRatio = component.count / bboxArea
-        const contour = analyzeBlueContour(component)
-        const compact = box.boxWidth <= 24 && box.boxHeight <= 24
-        const slender = Math.max(box.boxWidth, box.boxHeight) / Math.max(1, Math.min(box.boxWidth, box.boxHeight)) >= 2.2
-        const largeLowerLimb = box.boxHeight >= 28 || component.count / Math.max(1, width * height) > 0.025
-        const nearShoe = shoeIndexes.length > 0
-        const nearClothing = clothingIndexes.length > 0
-        const shoeRelations = shoeIndexes.map((shoeIndex) => {
-          const shoe = shoes[shoeIndex]
-          const shoeBox = metrics(shoe)
-          const overlap = intersectionArea(component, shoe)
-          const componentOverlap = overlap / bboxArea
-          const shoeOverlap = overlap / boxArea(shoe)
-          const centerInsideShoe = centerInsideBox(component, shoe, 0.02)
-          const centerInsideShoeCore = centerInsideBox(component, shoe, -0.08)
-          const shoeCenterYPx = (shoe.minY + shoe.maxY) / 2
-          const blueCenterYPx = (component.minY + component.maxY) / 2
-          const shoeHeightPx = Math.max(1, shoe.maxY - shoe.minY + 1)
-          const blueCenterXPercent = ((component.minX + component.maxX) / 2 / width) * 100
-          const blueCenterYPercent = (blueCenterYPx / height) * 100
-          const insideShoeEnvelope =
-            blueCenterXPercent >= shoeBox.left - 2 &&
-            blueCenterXPercent <= shoeBox.left + shoeBox.boxWidth + 2 &&
-            blueCenterYPercent >= shoeBox.top - 3 &&
-            blueCenterYPercent <= shoeBox.top + shoeBox.boxHeight + 4
-          const shoeUpperOrMiddleEntry =
-            insideShoeEnvelope &&
-            blueCenterYPx <= shoeCenterYPx + shoeHeightPx * 0.22
-          const belowShoeGripZone =
-            blueCenterYPx > shoeCenterYPx + shoeHeightPx * 0.22 ||
-            component.minY > shoe.minY + shoeHeightPx * 0.62
-          const verticalInsideShoe =
-            component.minY >= shoe.minY - height * 0.03 &&
-            component.maxY <= shoe.maxY + height * 0.08
-          const entersShoeBody = (centerInsideShoe && componentOverlap >= 0.18 && verticalInsideShoe && !belowShoeGripZone) || shoeUpperOrMiddleEntry
-          const outsideShoeGrip =
-            (belowShoeGripZone && componentOverlap < 0.28) ||
-            (!centerInsideShoe &&
-              componentOverlap < 0.16 &&
-              (box.centerX < shoeBox.left || box.centerX > shoeBox.left + shoeBox.boxWidth || box.centerY > shoeBox.top + shoeBox.boxHeight))
-          return { shoeIndex, shoeBox, componentOverlap, shoeOverlap, centerInsideShoe, centerInsideShoeCore, entersShoeBody, outsideShoeGrip, belowShoeGripZone, shoeUpperOrMiddleEntry }
-        })
-        const entersShoeBody = shoeRelations.some((relation) => relation.entersShoeBody || (relation.centerInsideShoeCore && !relation.belowShoeGripZone))
-        const mostlyInsideShoe = shoeRelations.some((relation) => relation.componentOverlap >= 0.34 && relation.centerInsideShoe)
-        const outerGrip = shoeRelations.some((relation) => relation.outsideShoeGrip)
-        const ankleShoeLock = nearShoe && contour.ankleLimbLock && !outerGrip
-        const clothingSideHandLock = !nearShoe && nearClothing && contour.fingerContourLock
-        const aboveShoe = shoeIndexes.some((shoeIndex) => {
-          const shoeBox = metrics(shoes[shoeIndex])
-          return box.centerY < shoeBox.centerY && box.centerX > shoeBox.left - 8 && box.centerX < shoeBox.left + shoeBox.boxWidth + 8
-        })
-        const outsideShoeSide = shoeIndexes.some((shoeIndex) => {
-          const shoeBox = metrics(shoes[shoeIndex])
-          return box.centerX < shoeBox.left - 2 ||
-            box.centerX > shoeBox.left + shoeBox.boxWidth + 2 ||
-            box.centerY < shoeBox.top - 2
-        })
-        const handScore =
-          (compact ? 4 : 0) +
-          (fillRatio < 0.42 ? 3 : 0) +
-          (nearShoe && outsideShoeSide ? 3 : 0) +
-          (outerGrip ? 8 : 0) +
-          (!nearClothing && nearShoe ? 2 : 0) +
-          (box.boxWidth <= 18 || box.boxHeight <= 18 ? 2 : 0)
-        const footScore =
-          (entersShoeBody ? 10 : 0) +
-          (mostlyInsideShoe ? 7 : 0) +
-          (largeLowerLimb && !outerGrip ? 4 : 0) +
-          (slender ? 3 : 0) +
-          (nearClothing && entersShoeBody ? 3 : 0) +
-          (nearShoe && aboveShoe ? 4 : 0) +
-          (fillRatio >= 0.38 ? 2 : 0)
-        const fingerContourLock = contour.fingerContourLock && !ankleShoeLock && !mostlyInsideShoe
-        const shoeInsertionLock = ankleShoeLock || entersShoeBody || mostlyInsideShoe
-        const handGripLock = (outerGrip || fingerContourLock || clothingSideHandLock) && !shoeInsertionLock
-        const kind = handGripLock ? 'HAND' : shoeInsertionLock ? 'FOOT/LEG' : footScore >= handScore ? 'FOOT/LEG' : 'HAND'
-        const reason = `handScore=${handScore}, footScore=${footScore}, fingerContourLock=${fingerContourLock ? 'yes' : 'no'}, ankleShoeLock=${ankleShoeLock ? 'yes' : 'no'}, clothingSideHandLock=${clothingSideHandLock ? 'yes' : 'no'}, shoeInsertionLock=${shoeInsertionLock ? 'yes' : 'no'}, handGripLock=${handGripLock ? 'yes' : 'no'}, entersShoeBody=${entersShoeBody ? 'yes' : 'no'}, mostlyInsideShoe=${mostlyInsideShoe ? 'yes' : 'no'}, outerGrip=${outerGrip ? 'yes' : 'no'}, rowRuns=${contour.maxRowRuns}, colRuns=${contour.maxColRuns}, terminalSplits=${contour.terminalSplitRows}/${contour.terminalSplitCols}, compact=${compact ? 'yes' : 'no'}, slender=${slender ? 'yes' : 'no'}, fill=${fillRatio.toFixed(2)}, touchingShoes=${shoeIndexes.length ? shoeIndexes.map((index) => `S${index + 1}`).join('/') : 'none'}, touchingClothing=${clothingIndexes.length ? clothingIndexes.map((index) => `R${index + 1}`).join('/') : 'none'}`
-        return { kind, reason }
       }
       const drawMask = (ctx: CanvasRenderingContext2D, mask: Uint8Array, components: HandAngleComponent[], stroke: string, fill: string) => {
         ctx.save()
@@ -4023,15 +3790,29 @@ function App() {
         }
         ctx.restore()
       }
+      const drawSafeLabel = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number) => {
+        const padding = Math.max(4, Math.round(width * 0.008))
+        const metrics = ctx.measureText(text)
+        const textWidth = metrics.width
+        const fontMatch = /(\d+(?:\.\d+)?)px/.exec(ctx.font)
+        const fontSize = fontMatch ? Number(fontMatch[1]) : Math.max(12, Math.round(width * 0.02))
+        const safeX = Math.max(padding, Math.min(x, width - textWidth - padding))
+        const safeY = Math.max(padding, Math.min(y, height - fontSize - padding))
+        ctx.fillText(text, safeX, safeY)
+      }
 
       const shoes = findComponents(masks.yellow, 0.0012).slice(0, 8)
       const bodyCandidates = findComponents(masks.blue, 0.0012).slice(0, 10)
+      const greenHandCandidates = findComponents(masks.green, 0.0012).slice(0, 10)
       const clothes = findComponents(masks.red, 0.002).slice(0, 6)
-      const blueClassifications = bodyCandidates.map((component) => {
-        const touchingShoes = touchIndexes(component, shoes, 0.08)
-        const touchingClothing = touchIndexes(component, clothes, 0.08)
-        return classifyBlue(component, touchingShoes, touchingClothing)
-      })
+      const blueClassifications = bodyCandidates.map(() => ({
+        kind: 'FOOT/LEG',
+        reason: 'hand-angle channel color lock: blue regions are always leg/foot/ankle; only green regions can be hand/wrist/fingers',
+      }))
+      const greenClassifications = greenHandCandidates.map(() => ({
+        kind: 'HAND',
+        reason: 'explicit green region in hand-angle upload; green is directly locked as hand/wrist/fingers',
+      }))
       const controlCanvas = document.createElement('canvas')
       controlCanvas.width = width
       controlCanvas.height = height
@@ -4059,21 +3840,32 @@ function App() {
       })
       drawMask(control, masks.red, clothes, '#b8b8b8', 'rgba(184,184,184,0.28)')
       drawMask(control, masks.blue, bodyCandidates, '#d8d8d8', 'rgba(216,216,216,0.26)')
+      drawMask(control, masks.green, greenHandCandidates, '#eeeeee', 'rgba(238,238,238,0.3)')
       drawMask(control, masks.yellow, shoes, '#ffffff', 'rgba(255,255,255,0.22)')
       control.fillStyle = '#ffffff'
       control.textBaseline = 'top'
       control.font = `bold ${Math.max(15, Math.round(width * 0.026))}px Arial`
       shoes.forEach((component, index) => {
         const touchingBlue = touchIndexes(component, bodyCandidates, 0.08)
-        const label = touchingBlue.length ? `S${index + 1} SHOE / HAND-FOOT` : `S${index + 1} DISPLAY`
-        control.fillText(label, component.minX + 8, component.minY + 8)
+        const touchingGreen = touchIndexes(component, greenHandCandidates, 0.08)
+        const label = touchingBlue.length && touchingGreen.length
+          ? `S${index + 1} SHOE / HAND + FOOT`
+          : touchingGreen.length
+            ? `S${index + 1} SHOE / HAND`
+            : touchingBlue.length
+              ? `S${index + 1} SHOE / FOOT`
+              : `S${index + 1} DISPLAY`
+        drawSafeLabel(control, label, component.minX + 8, component.minY + 8)
       })
       control.font = `bold ${Math.max(12, Math.round(width * 0.019))}px Arial`
       bodyCandidates.forEach((component, index) => {
-        control.fillText(`B${index + 1} ${blueClassifications[index]?.kind || 'HAND'}`, component.minX + 8, component.minY + 8)
+        drawSafeLabel(control, `B${index + 1} ${blueClassifications[index]?.kind || 'FOOT/LEG'}`, component.minX + 8, component.minY + 8)
+      })
+      greenHandCandidates.forEach((component, index) => {
+        drawSafeLabel(control, `G${index + 1} HAND`, component.minX + 8, component.minY + 8)
       })
       clothes.forEach((component, index) => {
-        control.fillText(`R${index + 1} CLOTHING`, component.minX + 8, component.minY + 8)
+        drawSafeLabel(control, `R${index + 1} CLOTHING`, component.minX + 8, component.minY + 8)
       })
       const blob = await canvasToBlob(controlCanvas, 'image/png')
       if (!blob) return null
@@ -4083,7 +3875,8 @@ function App() {
         const box = metrics(component)
         const axis = axisForComponent(masks.yellow, component)
         const touchingBlue = touchIndexes(component, bodyCandidates, 0.08).map((blueIndex) => `B${blueIndex + 1}`)
-        return `S${index + 1}: shoe/yellow region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingBlue=${touchingBlue.length ? touchingBlue.join('/') : 'none'}. Yellow controls product shoe placement/angle/scale/occlusion only; product shoe appearance comes only from uploaded product shoe.`
+        const touchingGreen = touchIndexes(component, greenHandCandidates, 0.08).map((greenIndex) => `G${greenIndex + 1}`)
+        return `S${index + 1}: shoe/yellow region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingBlue=${touchingBlue.length ? touchingBlue.join('/') : 'none'}, touchingGreenHands=${touchingGreen.length ? touchingGreen.join('/') : 'none'}. Yellow controls product shoe placement/angle/scale/occlusion only; product shoe appearance comes only from uploaded product shoe.`
       })
       const bodyLines = bodyCandidates.map((component, index) => {
         const box = metrics(component)
@@ -4091,7 +3884,15 @@ function App() {
         const touchingShoes = touchIndexes(component, shoes, 0.08).map((shoeIndex) => `S${shoeIndex + 1}`)
         const touchingRed = touchIndexes(component, clothes, 0.08).map((redIndex) => `R${redIndex + 1}`)
         const classification = blueClassifications[index]
-        return `B${index + 1}: ${classification?.kind || 'HAND'} by code, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingShoes=${touchingShoes.length ? touchingShoes.join('/') : 'none'}, touchingClothing=${touchingRed.length ? touchingRed.join('/') : 'none'}, classificationReason=${classification?.reason || 'none'}. Generate this B region as ${classification?.kind === 'FOOT/LEG' ? 'leg/foot/ankle' : 'hand/fingers/wrist'}; do not reinterpret it as the other body part.`
+        return `B${index + 1}: ${classification?.kind || 'FOOT/LEG'} by code, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingShoes=${touchingShoes.length ? touchingShoes.join('/') : 'none'}, touchingClothing=${touchingRed.length ? touchingRed.join('/') : 'none'}, classificationReason=${classification?.reason || 'none'}. Generate this B region as leg/foot/ankle only; never generate it as hand, fingers, or wrist.`
+      })
+      const greenHandLines = greenHandCandidates.map((component, index) => {
+        const box = metrics(component)
+        const axis = axisForComponent(masks.green, component)
+        const touchingShoes = touchIndexes(component, shoes, 0.08).map((shoeIndex) => `S${shoeIndex + 1}`)
+        const touchingRed = touchIndexes(component, clothes, 0.08).map((redIndex) => `R${redIndex + 1}`)
+        const classification = greenClassifications[index]
+        return `G${index + 1}: HAND by explicit green region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingShoes=${touchingShoes.length ? touchingShoes.join('/') : 'none'}, touchingClothing=${touchingRed.length ? touchingRed.join('/') : 'none'}, classificationReason=${classification.reason}. Generate this G region as hand/fingers/wrist only; never generate it as leg, foot, or ankle.`
       })
       const clothingLines = clothes.map((component, index) => {
         const box = metrics(component)
@@ -4100,19 +3901,21 @@ function App() {
       const layout = [
         'HAND ANGLE CONTROL HARD CONSTRAINT:',
         'This is the dedicated code-generated control for the upload channel "angle reference with hands". It does not use the normal angle-reference code logic or normal angle-reference prompt.',
-        'Color meaning: yellow/S = product shoe placement/angle/scale/occlusion; blue/B = code-classified HAND or FOOT/LEG; red/R = clothing support; black/empty = background.',
-        'Coordinate hard-lock: treat this hand-angle control as a fixed X0-X100 / Y0-Y100 canvas. Every S/B/R bbox left/top/width/height/center is mandatory. Do not recenter, rebalance, beautify, flip, straighten, or move objects into a generic commercial pose. The original uploaded angle image and aesthetic wording only verify the layout; they must not override the numeric S/B/R coordinates.',
-        'Blue rule for this hand-angle channel: each B region is given a definite code classification, HAND or FOOT/LEG, from the blue contour and its contact with yellow shoes/red clothing. Follow the B classification exactly; do not reinterpret HAND as leg or FOOT/LEG as hand.',
-        'Hand-supported shoe rule: a yellow shoe touched by a blue hand candidate may be handheld or hand-supported display shoe; it must not automatically become worn-on-foot. A yellow shoe worn by blue foot/ankle/lower-leg candidate becomes worn shoe.',
+        'Color meaning: yellow/S = product shoe placement/angle/scale/occlusion; green/G = explicit hand/wrist/finger region; blue/B = leg/foot/ankle region only; red/R = clothing support; black/empty = background.',
+        'Coordinate hard-lock: treat this hand-angle control as a fixed X0-X100 / Y0-Y100 canvas. Every S/B/G/R bbox left/top/width/height/center is mandatory. Do not recenter, rebalance, beautify, flip, straighten, or move objects into a generic commercial pose. The original uploaded angle image and aesthetic wording only verify the layout; they must not override the numeric S/B/G/R coordinates.',
+        'Green/blue rule for this hand-angle channel: every green/G region is HAND and every blue/B region is FOOT/LEG. Follow these fixed color roles exactly; do not reinterpret green as leg or blue as hand.',
+        'Hand-supported shoe rule: a yellow shoe touched by a green/G hand candidate may be handheld or hand-supported display shoe; it must not automatically become worn-on-foot. A yellow shoe worn by blue foot/ankle/lower-leg candidate becomes worn shoe.',
         `mainShoeObjectCount = ${shoes.length}`,
-        `blueHandCount = ${blueClassifications.filter((item) => item.kind === 'HAND').length}`,
+        `greenHandCount = ${greenHandCandidates.length}`,
+        'blueHandCount = 0',
         `blueFootLegCount = ${blueClassifications.filter((item) => item.kind === 'FOOT/LEG').length}`,
         `redClothingRegionCount = ${clothes.length}`,
-        clothes.length === 0 ? 'No red/R clothing region is detected in this hand-angle control. Do not generate clothing, garment, skirt hem, pants hem, sleeve, fabric panel, torso, or outfit area. Show only the shoes and the code-classified hands/feet/legs required by the S/B layout.' : '',
+        clothes.length === 0 ? 'No red/R clothing region is detected in this hand-angle control. Do not generate clothing, garment, skirt hem, pants hem, sleeve, fabric panel, torso, or outfit area. Show only the shoes, green/G hands if present, and blue/B feet/legs required by the S/B/G layout.' : '',
         shoeLines.length ? 'SHOE/YELLOW MAP:\n' + shoeLines.join('\n') : 'SHOE/YELLOW MAP: none detected.',
-        bodyLines.length ? 'BLUE HAND-OR-LEG CANDIDATE MAP:\n' + bodyLines.join('\n') : 'BLUE HAND-OR-LEG CANDIDATE MAP: none detected.',
+        bodyLines.length ? 'BLUE LEG/FOOT MAP:\n' + bodyLines.join('\n') : 'BLUE LEG/FOOT MAP: none detected.',
+        greenHandLines.length ? 'GREEN HAND MAP:\n' + greenHandLines.join('\n') : 'GREEN HAND MAP: none detected.',
         clothingLines.length ? 'RED CLOTHING MAP:\n' + clothingLines.join('\n') : 'RED CLOTHING MAP: none detected.',
-        'Final image must not show labels, grid, gray guide fills, white boxes, or yellow/blue/red/black mask colors. Replace every region with realistic photographic content from the assigned references.',
+        'Final image must not show labels, grid, gray guide fills, white boxes, or yellow/green/blue/red/black mask colors. Replace every region with realistic photographic content from the assigned references.',
       ].join('\n')
       return { file: controlFile, layout }
     } catch {
@@ -4303,7 +4106,7 @@ function App() {
         const uploadedAnglePrompt = angleItem.uploadedFile
           ? buildUploadedAngleGenerationPrompt([
               uploadedAngleIsRealPhoto ? 'REAL PHOTO ANGLE REFERENCE' : '',
-              useHandAngleControl ? 'USER UPLOADED ANGLE REFERENCE WITH HANDS: use the dedicated hand-angle control image and hand-angle layout text for this channel. Yellow/S regions are shoes, red/R regions are clothing, and every blue/B region has a definite code classification: HAND or FOOT/LEG. Follow that classification exactly. A HAND touching or holding a shoe makes that shoe hand-held or hand-supported, not automatically worn. A FOOT/LEG entering or wearing a shoe makes that shoe worn.' : '',
+              useHandAngleControl ? 'USER UPLOADED ANGLE REFERENCE WITH HANDS: use the dedicated hand-angle control image and hand-angle layout text for this channel. Yellow/S regions are shoes, green/G regions are explicit hands, blue/B regions are legs/feet/ankles only, red/R regions are clothing. Follow the S/B/G/R classifications exactly. A green/G HAND touching or holding a shoe makes that shoe hand-held or hand-supported, not automatically worn. A blue/B FOOT/LEG entering or wearing a shoe makes that shoe worn.' : '',
               uploadedAngleSmartAnalysis,
             ].filter(Boolean).join('\n'))
           : ''
@@ -4316,7 +4119,7 @@ function App() {
           modelFile ? 'A model reference image is uploaded. Use it only for outfit category/color/fabric, body-limb appearance, skin tone, lower-body proportion, and elegant styling as secondary support for the product shoes. Do not copy model shoes, model background, wall, floor, props, basket, flowers, watermark, or lighting pattern.' : 'No model reference image is uploaded. Generate simple natural body limbs/clothing only as required by the angle reference.',
           'Lower-body-only framing: never generate the model face, head, portrait, or full upper body. Keep the crop focused on shoes, feet, legs, hands if present in the angle mask, and only the clothing portion required around the lower body.',
           isHandAngleUpload
-            ? 'The dedicated hand-angle control image plus hand-angle layout text must dominate pose and camera: yellow/S controls shoe placement and role; blue/B has a definite code classification as HAND or FOOT/LEG from contour/contact; red/R controls clothing. Follow each B classification exactly and do not use the normal angle-reference code logic or normal angle-reference prompt rules for this hand-angle channel.'
+            ? 'The dedicated hand-angle control image plus hand-angle layout text must dominate pose and camera: yellow/S controls shoe placement and role; green/G controls explicit hand/wrist/finger regions; blue/B controls leg/foot/ankle regions only; red/R controls clothing. Follow each S/B/G/R classification exactly and do not use the normal angle-reference code logic or normal angle-reference prompt rules for this hand-angle channel.'
             : uploadedAngleIsRealPhoto
             ? 'The uploaded real angle photo must dominate pose and camera: shoe count, shoe placement, shoe direction, toe direction, heel direction, shoe angle, body-facing direction, foot/leg/hand/arm pose, camera height, lens perspective, scale relationship, crop, overlap, and occlusion must follow the real angle photo rather than the product photo or model photo. Do not convert it into a color-block mask workflow.'
             : 'The angle mask plus code-generated structure analysis must dominate pose and shoe layout: shoe count, shoe placement, shoe direction, toe direction, heel direction, body-facing direction, hand/foot candidate roles, shoe-limb bindings, depth ordering, camera angle, scale relationship, and occlusion must follow the angle reference rather than the product photo or model photo.',
@@ -7502,4 +7305,5 @@ function App() {
 }
 
 export default App
+
 
