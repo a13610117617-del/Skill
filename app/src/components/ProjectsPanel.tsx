@@ -36,6 +36,7 @@ type ProjectsPanelProps = {
   onDownload: (imageUrl: string, title: string) => Promise<void>
   onDownloadMany: (items: Array<{ imageUrl: string; title: string }>) => Promise<void>
   onDeleteProjects: (projectIds: string[]) => Promise<void>
+  onRefresh: () => Promise<void>
   onReuseImageSettings?: (project: ProjectItem, image: ProjectImage) => void
   onToggleFavorite?: (projectId: string, imageUrl: string, favorite: boolean) => Promise<void>
   onError: (message: string) => void
@@ -122,6 +123,17 @@ function SearchIcon() {
         strokeWidth="1.8"
       />
       <path d="m12 12 3.1 3.1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function RefreshIcon() {
+  return (
+    <svg className="project-refresh-icon" aria-hidden="true" viewBox="0 0 18 18" fill="none">
+      <path d="M14.2 6.8A5.5 5.5 0 0 0 4 5.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M13.9 3.8v3.2h-3.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3.8 11.2A5.5 5.5 0 0 0 14 12.8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M4.1 14.2V11h3.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -231,7 +243,7 @@ function getDisplayPrompt(image: ProjectImage) {
 }
 
 export function ProjectsPanel(props: ProjectsPanelProps) {
-  const { open, loading, projects, onClose, onOpenLightbox, onDownload, onDownloadMany, onDeleteProjects, onReuseImageSettings, onToggleFavorite, onError } = props
+  const { open, loading, projects, onClose, onOpenLightbox, onDownload, onDownloadMany, onDeleteProjects, onRefresh, onReuseImageSettings, onToggleFavorite, onError } = props
   const [selectionMode, setSelectionMode] = useState(false)
   const [deleteMode, setDeleteMode] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
@@ -570,6 +582,20 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
         ) : (
           <div className="project-list">
             <div className="project-tools">
+              <button
+                type="button"
+                className={`project-refresh-button ${loading ? 'loading' : ''}`}
+                aria-label="刷新生成记录"
+                title="刷新生成记录"
+                disabled={loading}
+                onClick={() => {
+                  onRefresh().catch((error) =>
+                    onError(error instanceof Error ? error.message : '刷新生成记录失败。'),
+                  )
+                }}
+              >
+                <RefreshIcon />
+              </button>
               <div className="project-search-wrap" ref={searchRef}>
                 {searchOpen ? (
                   <form

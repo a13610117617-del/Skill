@@ -3988,7 +3988,7 @@ button:disabled {
   top: 54px;
   z-index: 7;
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: auto auto auto 1fr;
   align-items: center;
   gap: 10px;
   margin: -10px -22px 2px;
@@ -3997,6 +3997,45 @@ button:disabled {
     linear-gradient(180deg, rgba(10, 15, 19, 0.98), rgba(10, 15, 19, 0.94)),
     #0a0f13;
   box-shadow: 0 14px 22px rgba(0, 0, 0, 0.18);
+}
+
+.project-refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgba(232, 238, 242, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(247, 251, 253, 0.76);
+}
+
+.project-refresh-button:hover:not(:disabled),
+.project-refresh-button:focus-visible {
+  border-color: rgba(223, 255, 0, 0.44);
+  color: var(--lime);
+}
+
+.project-refresh-button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.project-refresh-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.project-refresh-button.loading .project-refresh-icon {
+  animation: project-refresh-spin 900ms linear infinite;
+}
+
+@keyframes project-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .project-search-wrap {

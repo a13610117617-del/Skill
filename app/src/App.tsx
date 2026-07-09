@@ -331,7 +331,7 @@ type MultiAngleSlot = {
 }
 
 type MergeImageSlot = {
-  id: 'product' | 'background' | 'angle' | 'angleHand' | 'model'
+  id: 'product' | 'background' | 'angle' | 'angleHand' | 'angleSingle' | 'model'
   label: string
   hint: string
 }
@@ -460,6 +460,7 @@ const mergeImageSlots: MergeImageSlot[] = [
   { id: 'background', label: '背景图', hint: '锁定墙面、地面、空间、光线和阴影方向' },
   { id: 'angle', label: '角度参考图', hint: '黄=鞋子角度，蓝=腿，红=衣服，黑=背景区域' },
   { id: 'angleHand', label: '角度参考图（含手）', hint: '用于手持、手扶、手拿鞋等含手部动作的角度参考' },
+  { id: 'angleSingle', label: '角度参考图（单脚）', hint: '用于只有一只脚穿鞋，另一只鞋为展示或不出现的角度参考' },
   { id: 'model', label: '模特参考图', hint: '可选：按蓝/红区域参考腿部和穿搭' },
 ]
 
@@ -480,14 +481,26 @@ const mergeAnglePosePrompts: Record<string, string> = {
   'angle-15': 'Selected pose prompt: seated cross-leg shoe-try-on pose with scattered foreground shoes. The model should read as a seated cross-leg try-on posture, as if supported outside the frame, never sitting on the floor, with one leg crossed over the other, creating a bent-knee try-on posture. Do not add a visible stool, bench, chair, platform, or support object unless it is clearly required by the selected angle image. Follow the selected angle image for camera angle and crop: if the angle image only shows skirt hem, legs, shoes, and scattered foreground shoes, do not force a full upper body unless the output is horizontal and needs extra framing. The worn product shoe on the main crossed or forward foot is the key display shoe; any scattered foreground shoes are only ground/display shoes and must not create additional legs. Preserve the seated posture feeling, leg crossing, ankle relationship, shoe angle, low side/front camera view, and spatial relationship shown in the angle image.',
 }
 
-const mergeAngleLibrary = Array.from({ length: 15 }, (_, index) => index + 1)
-  .filter((angleNumber) => angleNumber !== 7)
+const mergeAngleLibrary = [
+  ...Array.from({ length: 15 }, (_, index) => index + 1).filter((angleNumber) => angleNumber !== 7),
+  17,
+  18,
+  19,
+  20,
+  21,
+  22,
+  23,
+]
   .map((angleNumber, displayIndex) => ({
     id: `angle-${String(angleNumber).padStart(2, '0')}`,
     label: `角度 ${displayIndex + 1}`,
     url: `/assets/merge-angle-library/angle-${String(angleNumber).padStart(2, '0')}.png`,
   }))
 const mergeAngleBatchLimit = 10
+const mergeAngleUploadSlotIds = ['angle', 'angleHand', 'angleSingle'] as const
+type MergeAngleUploadSlotId = (typeof mergeAngleUploadSlotIds)[number]
+const isMergeAngleUploadSlot = (slotId: string): slotId is MergeAngleUploadSlotId =>
+  mergeAngleUploadSlotIds.includes(slotId as MergeAngleUploadSlotId)
 
 const mergeImageSizeOptions = [
   { label: '智能尺寸', detail: '按背景图比例', value: 'auto' },
@@ -814,7 +827,7 @@ function App() {
   const [multiAngleFiles, setMultiAngleFiles] = useState<Record<string, File[]>>({})
   const [mergeImageFiles, setMergeImageFiles] = useState<Record<string, File[]>>({})
   const [draggingMergeImageSlot, setDraggingMergeImageSlot] = useState('')
-  const [mergeReferenceModalSlot, setMergeReferenceModalSlot] = useState<'angle' | 'angleHand' | ''>('')
+  const [mergeReferenceModalSlot, setMergeReferenceModalSlot] = useState<MergeAngleUploadSlotId | ''>('')
   const [selectedMergeAngleIds, setSelectedMergeAngleIds] = useState<string[]>([])
   const [mergeAngleLibraryAnalyses, setMergeAngleLibraryAnalyses] = useState<Record<string, string>>({})
   const [mergeImageSize, setMergeImageSize] = useState('auto')
@@ -1185,8 +1198,7 @@ function App() {
     return nextSkills
   }
 
-  async function openProjectsPanel() {
-    setProjectsOpen(true)
+  async function refreshProjectsPanel() {
     setProjectsLoading(true)
     setError('')
     try {
@@ -1199,6 +1211,11 @@ function App() {
     } finally {
       setProjectsLoading(false)
     }
+  }
+
+  async function openProjectsPanel() {
+    setProjectsOpen(true)
+    await refreshProjectsPanel()
   }
 
   async function deleteProjects(projectIds: string[]) {
@@ -1847,11 +1864,11 @@ function App() {
     setError('')
     setMergeImageFiles((current) => ({
       ...current,
-      [slotId]: slotId === 'angle' || slotId === 'angleHand'
+      [slotId]: isMergeAngleUploadSlot(slotId)
         ? [...(current[slotId] || []), ...images].slice(0, mergeAngleBatchLimit)
         : [images[0]],
     }))
-    if (slotId === 'angle' || slotId === 'angleHand') setSelectedMergeAngleIds([])
+    if (isMergeAngleUploadSlot(slotId)) setSelectedMergeAngleIds([])
   }
 
   function handleMergeImageDragOver(event: DragEvent<HTMLElement>, slotId: string) {
@@ -1877,6 +1894,10 @@ function App() {
       ...current,
       [slotId]: (current[slotId] || []).filter((_, index) => index !== indexToRemove),
     }))
+  }
+
+  function mergeReferenceSlotLabel(slotId: MergeAngleUploadSlotId) {
+    return mergeImageSlots.find((slot) => slot.id === slotId)?.label || '角度参考图'
   }
 
   function buildMergeImageBrief(baseBrief: string) {
@@ -3437,6 +3458,15 @@ function App() {
       control.fillStyle = '#ffffff'
       control.font = `bold ${Math.max(16, Math.round(width * 0.028))}px Arial`
       control.textBaseline = 'top'
+      const drawSafeControlLabel = (text: string, rawX: number, rawY: number) => {
+        const metrics = control.measureText(text)
+        const labelWidth = Math.ceil(metrics.width)
+        const fontHeightMatch = String(control.font).match(/(\d+(?:\.\d+)?)px/i)
+        const fontHeight = fontHeightMatch ? Number(fontHeightMatch[1]) : Math.max(14, Math.round(width * 0.022))
+        const x = Math.min(Math.max(6, rawX), Math.max(6, width - labelWidth - 8))
+        const y = Math.min(Math.max(6, rawY), Math.max(6, height - fontHeight - 8))
+        control.fillText(text, x, y)
+      }
       yellowComponents.forEach((component, index) => {
         const connectedToLegFoot = shoeConnectedToKind(index, 'leg-foot')
         const connectedToHand = shoeConnectedToKind(index, 'hand')
@@ -3445,7 +3475,7 @@ function App() {
           : connectedToHand
             ? `S${index + 1} HAND${shoeInstanceSuffix(index)}`
             : `S${index + 1} DISPLAY${shoeInstanceSuffix(index)}`
-        control.fillText(label, component.minX + 8, component.minY + 8)
+        drawSafeControlLabel(label, component.minX + 8, component.minY + 8)
       })
       control.font = `bold ${Math.max(13, Math.round(width * 0.02))}px Arial`
       blueRegionAnalysis.forEach((region, index) => {
@@ -3454,10 +3484,10 @@ function App() {
           : region.kind === 'hand'
             ? `B${index + 1} HAND`
             : `B${index + 1} DETAIL`
-        control.fillText(label, region.component.minX + 8, region.component.minY + 8)
+        drawSafeControlLabel(label, region.component.minX + 8, region.component.minY + 8)
       })
       redComponents.forEach((component, index) => {
-        control.fillText(`R${index + 1} CLOTHING`, component.minX + 8, component.minY + 8)
+        drawSafeControlLabel(`R${index + 1} CLOTHING`, component.minX + 8, component.minY + 8)
       })
       const blob = await canvasToBlob(controlCanvas, 'image/png')
       if (!blob) return null
@@ -3606,6 +3636,570 @@ function App() {
       return { file: controlFile, layout }
     } catch {
       return null
+    }
+  }
+
+  async function buildSingleFootAngleControl(file: File) {
+    const cleaned = await buildCleanedAngleControl(file)
+    if (!cleaned) return null
+
+    const forceSingleFootLayout = (layout: string, enabled: boolean, options: { cameraViewValue?: string; cameraLockLine?: string; pairAnalysisLine?: string } = {}) => {
+      if (!enabled) return layout
+      let next = layout
+      const hasSeparateDisplayShoe = /\bS\d+\s+DISPLAY\s+x\d+\b|standaloneDisplayShoes\s*=\s*S\d+/i.test(next)
+      if (hasSeparateDisplayShoe) {
+        const shoeIds = new Set(Array.from(next.matchAll(/^S(\d+)\b/gim)).map((match) => match[1]))
+        const visibleShoeCount = Math.max(1, shoeIds.size)
+        next = next
+          .replace(/\bS(\d+)\s+WORN\s+x\d+\b/g, 'S$1 WORN x1')
+          .replace(/\bS(\d+)\s+DISPLAY\s+x\d+\b/g, 'S$1 DISPLAY x1')
+          .replace(/\bS object explanation: S(\d+) x\d+ is worn/g, 'S object explanation: S$1 x1 is worn')
+          .replace(/\bS object explanation: S(\d+) x\d+ is standalone display shoe/g, 'S object explanation: S$1 x1 is standalone display shoe')
+          .replace(/\bBinding S(\d+) x\d+:/g, 'Binding S$1 x1:')
+          .replace(/representedShoeCount=2, but single-foot override splits this as wornShoeCount=1 \+ displayShoeCount=1/g, 'representedShoeCount=1')
+          .replace(/representedShoeCount=2/g, 'representedShoeCount=1')
+          .replace(/^mainShoeCount\s*=\s*\d+$/gim, `mainShoeCount = ${visibleShoeCount}`)
+          .replace(/^wornShoeCount\s*=\s*\d+$/gim, 'wornShoeCount = 1')
+          .replace(/^standaloneDisplayShoeCount\s*=\s*\d+$/gim, 'standaloneDisplayShoeCount = 1')
+          .replace(/^wornShoes\s*=\s*(S\d+)\s+x\d+.*$/gim, 'wornShoes = $1 x1')
+          .replace(/^standaloneDisplayShoes\s*=\s*(S\d+)\s+x\d+.*$/gim, 'standaloneDisplayShoes = $1 x1')
+          .replace(/Worn shoes:\s*(S\d+)\s*x\d+/gi, 'Worn shoes: $1 x1')
+          .replace(/Standalone display shoes:\s*(S\d+)\s*x\d+/gi, 'Standalone display shoes: $1 x1')
+          .replace(/represented actual shoe count:\s*\d+/gi, `represented actual shoe count: ${visibleShoeCount}`)
+          .replace(/If an S object has x2, it represents two product shoes within the same layout object\./g, 'In this single-foot channel, follow the cleaned x1 worn/display role labels instead of raw x2 suffixes.')
+          .replace(/If representedShoeCount is 2, generate two matching product shoes inside this S object while preserving this same layout region and role\./g, 'In this single-foot channel, each S object represents one visible product shoe unless the code explicitly says otherwise.')
+          .replace(/any S object marked x2 represents two actual product shoes inside that same layout object/g, 'in this single-foot channel, use the cleaned single-foot role labels: exactly one worn shoe on footX1 and the separate DISPLAY S object as one bare display shoe')
+      } else {
+        next = next
+          .replace(/\bS(\d+)\s+WORN\s+x2\b/g, 'S$1 WORN x1 + DISPLAY x1 (single-foot override)')
+          .replace(/representedShoeCount=2/g, 'representedShoeCount=2, but single-foot override splits this as wornShoeCount=1 + displayShoeCount=1')
+          .replace(/^standaloneDisplayShoes\s*=\s*none\s*$/gim, 'standaloneDisplayShoes = inferred display shoe from single-foot S x2 override')
+          .replace(/Standalone display shoes:\s*none/gi, 'Standalone display shoes: inferred display shoe from single-foot S x2 override')
+          .replace(/If representedShoeCount is 2, generate two matching product shoes inside this S object while preserving this same layout region and role\./g, 'If representedShoeCount is 2 in this single-foot channel, generate one product shoe worn on footX1 and one bare display product shoe, while preserving this same layout region and role.')
+          .replace(/any S object marked x2 represents two actual product shoes inside that same layout object/g, 'in this single-foot channel, any S object marked x2 means one worn shoe on footX1 plus one bare display shoe in the same layout object')
+      }
+      if (options.cameraViewValue) {
+        next = next
+          .replace(/^cameraView\s*=.*$/gim, `cameraView = ${options.cameraViewValue}`)
+          .replace(/^Camera inference by code:.*$/gim, `Camera inference by code: ${options.cameraViewValue}. ${options.cameraLockLine || ''}`.trim())
+          .replace(/The detected camera is "[^"]+"/g, `The detected camera is "${options.cameraViewValue}"`)
+      }
+      if (options.cameraLockLine) {
+        next = next.replace(/^CAMERA LOCK:.*$/gim, options.cameraLockLine)
+      }
+      if (options.pairAnalysisLine && !/SINGLE-FOOT SIDE PAIR ANALYSIS BY CODE/i.test(next)) {
+        next = [next, options.pairAnalysisLine].filter(Boolean).join('\n')
+      }
+      return next
+    }
+
+    const singleFootBaseLines = [
+      'SINGLE-FOOT ANGLE CHANNEL HARD CONSTRAINT:',
+      'This addendum applies only to the uploaded angle reference single-foot channel. It must not change the normal angle-reference channel, the hand-angle channel, or the angle library.',
+      'Single-foot rule: if the code detects only one blue foot/leg region, the final image must show exactly one worn foot/leg. Do not invent a second worn foot, second leg, or second ankle to balance the composition.',
+      'Display-shoe rule: any yellow shoe object not bound to the single blue foot/leg region is a bare display product shoe only. It must not receive skin, toes, sock, ankle, leg, or a second foot inside it.',
+      'S WORN x2 override rule: in this single-foot channel only, if the reused normal control text or image contains S WORN x2 while the code also detects footX1, do not read it as two worn shoes. Read it as one worn product shoe on footX1 plus one bare display product shoe in the same yellow layout area.',
+    ]
+
+    try {
+      const bitmap = await createImageBitmap(file)
+      const width = bitmap.width
+      const height = bitmap.height
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const context = canvas.getContext('2d', { willReadFrequently: true })
+      if (!context) {
+        return {
+          ...cleaned,
+          layout: [cleaned.layout, singleFootBaseLines.join('\n')].filter(Boolean).join('\n\n'),
+        }
+      }
+      context.drawImage(bitmap, 0, 0, width, height)
+      const pixels = context.getImageData(0, 0, width, height).data
+      const masks = {
+        yellow: new Uint8Array(width * height),
+        blue: new Uint8Array(width * height),
+        red: new Uint8Array(width * height),
+      }
+      for (let index = 0; index < width * height; index += 1) {
+        const offset = index * 4
+        const r = pixels[offset]
+        const g = pixels[offset + 1]
+        const b = pixels[offset + 2]
+        const a = pixels[offset + 3]
+        if (a < 24) continue
+        if (r > 150 && g > 125 && b < 135 && r + g > b * 2 + 110) masks.yellow[index] = 1
+        else if (b > 110 && r < 135 && g < 170 && b > r * 1.15 && b > g * 1.05) masks.blue[index] = 1
+        else if (r > 135 && g < 130 && b < 130 && r > g * 1.2 && r > b * 1.2) masks.red[index] = 1
+      }
+
+      type SingleFootComponent = { minX: number; minY: number; maxX: number; maxY: number; count: number }
+      const findComponents = (mask: Uint8Array, minRatio = 0.0015) => {
+        const visited = new Uint8Array(mask.length)
+        const components: SingleFootComponent[] = []
+        const queue: number[] = []
+        for (let startIndex = 0; startIndex < mask.length; startIndex += 1) {
+          if (!mask[startIndex] || visited[startIndex]) continue
+          let minX = width
+          let minY = height
+          let maxX = 0
+          let maxY = 0
+          let count = 0
+          queue.length = 0
+          queue.push(startIndex)
+          visited[startIndex] = 1
+          for (let head = 0; head < queue.length; head += 1) {
+            const current = queue[head]
+            const x = current % width
+            const y = Math.floor(current / width)
+            minX = Math.min(minX, x)
+            minY = Math.min(minY, y)
+            maxX = Math.max(maxX, x)
+            maxY = Math.max(maxY, y)
+            count += 1
+            const neighbors = [current - 1, current + 1, current - width, current + width]
+            for (const next of neighbors) {
+              if (next < 0 || next >= mask.length || visited[next] || !mask[next]) continue
+              const nx = next % width
+              if ((next === current - 1 || next === current + 1) && Math.abs(nx - x) !== 1) continue
+              visited[next] = 1
+              queue.push(next)
+            }
+          }
+          if (count > width * height * minRatio) components.push({ minX, minY, maxX, maxY, count })
+        }
+        return components.sort((a, b) => b.count - a.count)
+      }
+      const metrics = (component: SingleFootComponent) => {
+        const left = Math.round((component.minX / width) * 100)
+        const top = Math.round((component.minY / height) * 100)
+        const boxWidth = Math.round(((component.maxX - component.minX + 1) / width) * 100)
+        const boxHeight = Math.round(((component.maxY - component.minY + 1) / height) * 100)
+        const centerX = Math.round((((component.minX + component.maxX) / 2) / width) * 100)
+        const centerY = Math.round((((component.minY + component.maxY) / 2) / height) * 100)
+        return { left, top, boxWidth, boxHeight, centerX, centerY }
+      }
+      const weightedCenter = (components: SingleFootComponent[]) => {
+        const total = components.reduce((sum, component) => sum + component.count, 0)
+        if (!total) return null
+        const x = components.reduce((sum, component) => {
+          const box = metrics(component)
+          return sum + box.centerX * component.count
+        }, 0) / total
+        const y = components.reduce((sum, component) => {
+          const box = metrics(component)
+          return sum + box.centerY * component.count
+        }, 0) / total
+        return { x: Math.round(x), y: Math.round(y) }
+      }
+
+      const blueFootComponents = findComponents(masks.blue, 0.002).slice(0, 4)
+      const yellowShoeComponents = findComponents(masks.yellow, 0.0025).slice(0, 8)
+      const redClothingComponents = findComponents(masks.red, 0.002).slice(0, 4)
+      const readLayoutCount = (key: string) => {
+        const match = cleaned.layout.match(new RegExp(`^${key}\\s*=\\s*(\\d+)`, 'im'))
+        return match ? Number(match[1]) : null
+      }
+      const layoutLegFootCount = readLayoutCount('blueLegFootRegionCount')
+      const layoutHandCount = readLayoutCount('blueHandRegionCount')
+      const layoutSaysSingleFoot = layoutLegFootCount === 1 && (layoutHandCount === null || layoutHandCount === 0)
+      const singleFootDetected = true
+      const mergedBlueFootComponent = blueFootComponents.length
+        ? blueFootComponents.reduce<SingleFootComponent>((merged, component) => ({
+            minX: Math.min(merged.minX, component.minX),
+            minY: Math.min(merged.minY, component.minY),
+            maxX: Math.max(merged.maxX, component.maxX),
+            maxY: Math.max(merged.maxY, component.maxY),
+            count: merged.count + component.count,
+          }), { ...blueFootComponents[0] })
+        : null
+      const blueMain = singleFootDetected && mergedBlueFootComponent
+        ? metrics(mergedBlueFootComponent)
+        : blueFootComponents[0] ? metrics(blueFootComponents[0]) : null
+      const yellowCenter = weightedCenter(yellowShoeComponents)
+      const redMain = redClothingComponents[0] ? metrics(redClothingComponents[0]) : null
+      const redAtRightEdge = Boolean(redMain && redMain.centerX >= 72 && redMain.left + redMain.boxWidth >= 88)
+      const redAtTop = Boolean(redMain && redMain.top <= 18 && redMain.boxWidth >= 36)
+      const shoeLeftOfFoot = Boolean(blueMain && yellowCenter && yellowCenter.x < blueMain.centerX - 8)
+      const verticalLeg = Boolean(blueMain && blueMain.boxHeight > blueMain.boxWidth * 1.05)
+      const overheadSingleFootCamera = Boolean(redAtRightEdge && (shoeLeftOfFoot || (blueMain && blueMain.boxWidth >= blueMain.boxHeight * 0.72)))
+      const eyeLevelSingleFootCamera = Boolean(!overheadSingleFootCamera && redAtTop && verticalLeg)
+      const footCountLabel = singleFootDetected ? 'footX1' : `footX${blueFootComponents.length}`
+      const directionFromDeltaLocal = (dx: number, dy: number) => {
+        const horizontal = dx < -8 ? 'left' : dx > 8 ? 'right' : ''
+        const vertical = dy < -8 ? 'upper' : dy > 8 ? 'lower' : ''
+        if (vertical && horizontal) return `${vertical}-${horizontal}`
+        return vertical || horizontal || 'center'
+      }
+      type SingleFootShoeObject = SingleFootComponent & { source: 'component' | 'split' }
+      const componentDistance = (a: ReturnType<typeof metrics>, b: { x: number; y: number }) => Math.hypot(a.centerX - b.x, a.centerY - b.y)
+      const componentFromPixelPoints = (points: Array<{ x: number; y: number }>): SingleFootComponent | null => {
+        if (!points.length) return null
+        let minX = width
+        let minY = height
+        let maxX = 0
+        let maxY = 0
+        for (const point of points) {
+          minX = Math.min(minX, point.x)
+          minY = Math.min(minY, point.y)
+          maxX = Math.max(maxX, point.x)
+          maxY = Math.max(maxY, point.y)
+        }
+        return { minX, minY, maxX, maxY, count: points.length }
+      }
+      const splitSingleYellowShoeObject = (component: SingleFootComponent): [SingleFootShoeObject, SingleFootShoeObject] | null => {
+        const points: Array<{ x: number; y: number }> = []
+        const stride = Math.max(1, Math.round(Math.min(width, height) / 480))
+        for (let y = component.minY; y <= component.maxY; y += stride) {
+          for (let x = component.minX; x <= component.maxX; x += stride) {
+            if (!masks.yellow[y * width + x]) continue
+            points.push({ x, y })
+          }
+        }
+        if (points.length < 20) return null
+        const blueSeed = blueMain
+          ? { x: (blueMain.centerX / 100) * width, y: (blueMain.centerY / 100) * height }
+          : { x: (component.minX + component.maxX) / 2, y: (component.minY + component.maxY) / 2 }
+        let first = { ...blueSeed }
+        let second = points.reduce((farthest, point) => {
+          const distance = Math.hypot(point.x - first.x, point.y - first.y)
+          return distance > farthest.distance ? { point, distance } : farthest
+        }, { point: points[0], distance: -1 }).point
+        for (let iteration = 0; iteration < 8; iteration += 1) {
+          const buckets = [
+            { x: 0, y: 0, count: 0, points: [] as Array<{ x: number; y: number }> },
+            { x: 0, y: 0, count: 0, points: [] as Array<{ x: number; y: number }> },
+          ]
+          for (const point of points) {
+            const firstDistance = Math.hypot(point.x - first.x, point.y - first.y)
+            const secondDistance = Math.hypot(point.x - second.x, point.y - second.y)
+            const bucket = firstDistance <= secondDistance ? buckets[0] : buckets[1]
+            bucket.x += point.x
+            bucket.y += point.y
+            bucket.count += 1
+            bucket.points.push(point)
+          }
+          if (buckets[0].count) first = { x: buckets[0].x / buckets[0].count, y: buckets[0].y / buckets[0].count }
+          if (buckets[1].count) second = { x: buckets[1].x / buckets[1].count, y: buckets[1].y / buckets[1].count }
+        }
+        const firstPoints: Array<{ x: number; y: number }> = []
+        const secondPoints: Array<{ x: number; y: number }> = []
+        for (const point of points) {
+          const firstDistance = Math.hypot(point.x - first.x, point.y - first.y)
+          const secondDistance = Math.hypot(point.x - second.x, point.y - second.y)
+          ;(firstDistance <= secondDistance ? firstPoints : secondPoints).push(point)
+        }
+        const firstComponent = componentFromPixelPoints(firstPoints)
+        const secondComponent = componentFromPixelPoints(secondPoints)
+        if (!firstComponent || !secondComponent) return null
+        return [{ ...firstComponent, source: 'split' }, { ...secondComponent, source: 'split' }]
+      }
+      const inferSingleFootShoeObjects = () => {
+        const hasSeparateDisplayShoe = /\bS\d+\s+DISPLAY\s+x\d+\b|standaloneDisplayShoes\s*=\s*S\d+/i.test(cleaned.layout)
+        let objects: SingleFootShoeObject[] = []
+        if (hasSeparateDisplayShoe && yellowShoeComponents.length >= 2) {
+          objects = yellowShoeComponents.slice(0, 2).map((component) => ({ ...component, source: 'component' as const }))
+        } else if (yellowShoeComponents.length >= 2) {
+          objects = yellowShoeComponents.slice(0, 2).map((component) => ({ ...component, source: 'component' as const }))
+        } else if (yellowShoeComponents[0]) {
+          objects = splitSingleYellowShoeObject(yellowShoeComponents[0]) || [{ ...yellowShoeComponents[0], source: 'component' as const }]
+        }
+        if (!objects.length) return null
+        const bluePoint = blueMain ? { x: blueMain.centerX, y: blueMain.centerY } : yellowCenter || { x: 50, y: 50 }
+        const ordered = objects
+          .map((component) => ({ component, box: metrics(component) }))
+          .sort((a, b) => componentDistance(a.box, bluePoint) - componentDistance(b.box, bluePoint))
+        const worn = ordered[0]?.component
+        const display = ordered[1]?.component
+        return { worn, display }
+      }
+      const axisForSingleFootObject = (component: SingleFootComponent | null | undefined) => {
+        if (!component) return null
+        let count = 0
+        let sumX = 0
+        let sumY = 0
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            if (!masks.yellow[y * width + x]) continue
+            count += 1
+            sumX += x
+            sumY += y
+          }
+        }
+        if (!count) return null
+        const meanX = sumX / count
+        const meanY = sumY / count
+        let covXX = 0
+        let covXY = 0
+        let covYY = 0
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            if (!masks.yellow[y * width + x]) continue
+            const dx = x - meanX
+            const dy = y - meanY
+            covXX += dx * dx
+            covXY += dx * dy
+            covYY += dy * dy
+          }
+        }
+        const angle = 0.5 * Math.atan2(2 * covXY, covXX - covYY)
+        const vx = Math.cos(angle)
+        const vy = Math.sin(angle)
+        let minProjection = Number.POSITIVE_INFINITY
+        let maxProjection = Number.NEGATIVE_INFINITY
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            if (!masks.yellow[y * width + x]) continue
+            const projection = (x - meanX) * vx + (y - meanY) * vy
+            minProjection = Math.min(minProjection, projection)
+            maxProjection = Math.max(maxProjection, projection)
+          }
+        }
+        const endpointA = {
+          x: Math.round(((meanX + vx * minProjection) / width) * 100),
+          y: Math.round(((meanY + vy * minProjection) / height) * 100),
+        }
+        const endpointB = {
+          x: Math.round(((meanX + vx * maxProjection) / width) * 100),
+          y: Math.round(((meanY + vy * maxProjection) / height) * 100),
+        }
+        const bodyPoint = redMain ? { x: redMain.centerX, y: redMain.centerY } : blueMain ? { x: blueMain.centerX, y: blueMain.centerY } : { x: 50, y: 50 }
+        const distanceA = Math.hypot(endpointA.x - bodyPoint.x, endpointA.y - bodyPoint.y)
+        const distanceB = Math.hypot(endpointB.x - bodyPoint.x, endpointB.y - bodyPoint.y)
+        const heel = distanceA <= distanceB ? endpointA : endpointB
+        const toe = distanceA <= distanceB ? endpointB : endpointA
+        return { heel, toe, direction: directionFromDeltaLocal(toe.x - heel.x, toe.y - heel.y) }
+      }
+      const footSideMatch = cleaned.layout.match(/footSide=([^,\n]+)/i) || cleaned.layout.match(/is worn on foot \(([^)]*side foot[^)]*)\)/i)
+      const footSideText = String(footSideMatch?.[1] || '').toLowerCase()
+      const wornFootSide = /right-side/.test(footSideText)
+        ? 'RIGHT'
+        : /left-side/.test(footSideText)
+          ? 'LEFT'
+          : overheadSingleFootCamera
+            ? 'RIGHT'
+            : eyeLevelSingleFootCamera
+              ? 'LEFT'
+              : 'UNKNOWN'
+      const displayShoeSide = wornFootSide === 'RIGHT' ? 'LEFT' : wornFootSide === 'LEFT' ? 'RIGHT' : 'OPPOSITE'
+      const wornBuckleSide = wornFootSide === 'RIGHT' ? 'viewer-right' : wornFootSide === 'LEFT' ? 'viewer-left' : 'the detected worn-shoe side'
+      const displayBuckleSide = displayShoeSide === 'RIGHT' ? 'viewer-right' : displayShoeSide === 'LEFT' ? 'viewer-left' : 'the opposite side'
+      const inferredSingleFootShoes = inferSingleFootShoeObjects()
+      const wornShoeBox = inferredSingleFootShoes?.worn ? metrics(inferredSingleFootShoes.worn) : null
+      const displayShoeBox = inferredSingleFootShoes?.display ? metrics(inferredSingleFootShoes.display) : null
+      const wornShoeAxis = axisForSingleFootObject(inferredSingleFootShoes?.worn)
+      const displayShoeAxis = axisForSingleFootObject(inferredSingleFootShoes?.display)
+      const sharedToeDirection = wornShoeAxis?.direction || displayShoeAxis?.direction || 'preserve-reference'
+      const formatShoeBox = (box: ReturnType<typeof metrics> | null) => box
+        ? `bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%, ${box.centerY}%)`
+        : 'bbox inferred from the single-foot S x2 shoe mass'
+      const formatAxis = (axis: ReturnType<typeof axisForSingleFootObject> | null, fallbackDirection = sharedToeDirection) => axis
+        ? `heelPoint=(${axis.heel.x}%,${axis.heel.y}%), toePoint=(${axis.toe.x}%,${axis.toe.y}%), toeDirection=${axis.direction}`
+        : `toeDirection=${fallbackDirection}`
+      const singleFootCameraViewValue = overheadSingleFootCamera
+        ? 'strict first-person downward POV / true top-down try-on view. The camera is above the wearer looking down at the foot and shoes on the ground plane. The visible foot wearing the shoe is planted flat on the floor/ground, with the shoe sole contacting the floor; show the top surface of the shoe and foot, not a side profile. The bare display shoe also lies on the same floor plane. Do not convert this into eye-level, side-view, front-view, standing catalog, floating-foot, or studio side product camera.'
+        : eyeLevelSingleFootCamera
+          ? 'eye-level or low side-view product try-on view. The leg drops from clothing above and the shoe is seen more from the side/front, like reference image 2. Do not convert it to first-person overhead/top-down view.'
+          : 'preserve the uploaded single-foot angle exactly. Use the code control image coordinates, shoe/foot relationship, and visible camera height as the strongest camera reference.'
+      const singleFootCameraLockLine = overheadSingleFootCamera
+        ? 'CAMERA LOCK: use the single-foot first-person downward/top-down grounded-foot camera. Do not convert this to an eye-level, front-facing, side-view, standing catalog pose.'
+        : eyeLevelSingleFootCamera
+          ? 'CAMERA LOCK: use the single-foot eye-level or low side-view camera from the uploaded reference. Do not convert this to top-down, first-person downward, overhead, flat-lay, or standing catalog camera.'
+          : 'CAMERA LOCK: preserve the uploaded single-foot camera height and shoe/foot perspective exactly.'
+      const cameraLock = `cameraView = ${singleFootCameraViewValue}`
+      const singleFootCameraSideLock = overheadSingleFootCamera
+        ? `SINGLE-FOOT CAMERA SIDE LOCK BY CODE: cameraType=strict-first-person-downward/top-down-grounded-foot. The shoe worn on footX1 must be the ${wornFootSide} shoe with the buckle/clasp/strap fastener on ${wornBuckleSide}. The bare display shoe must be the ${displayShoeSide} shoe with the buckle/clasp/strap fastener on ${displayBuckleSide}. The worn shoe and display shoe must point their toes/fronts toward the same canvas direction; do not reverse one shoe toe direction to create the left/right pair. Keep this as one worn foot plus one bare display shoe, not two worn feet. The worn foot is on the floor and photographed from above; do not show a side silhouette or eye-level heel profile.`
+        : eyeLevelSingleFootCamera
+          ? `SINGLE-FOOT CAMERA SIDE LOCK BY CODE: cameraType=eye-level/side-view. The shoe worn on footX1 must be the ${wornFootSide} shoe with the buckle/clasp/strap fastener on ${wornBuckleSide}. The bare display shoe must be the ${displayShoeSide} shoe with the buckle/clasp/strap fastener on ${displayBuckleSide}. The worn shoe and display shoe must point their toes/fronts toward the same canvas direction; do not reverse one shoe toe direction to create the left/right pair. Keep this as one worn foot plus one bare display shoe, not two worn feet.`
+          : `SINGLE-FOOT CAMERA SIDE LOCK BY CODE: cameraType=preserve-uploaded-angle. Keep exactly one shoe worn on footX1 and exactly one bare display shoe. Do not generate two worn feet; preserve the detected shoe coordinates and buckle/clasp side relationship from the uploaded single-foot angle reference. The worn shoe must be the ${wornFootSide} side and the display shoe must be the ${displayShoeSide} side. The worn shoe and display shoe must point their toes/fronts toward the same canvas direction as detected in the uploaded reference.`
+      const singleFootToeDirectionLock = 'SINGLE-FOOT TOE DIRECTION SAME LOCK BY CODE: the shoe worn on footX1 and the bare display shoe must keep the same toe/front pointing direction on the canvas. Left/right shoe pairing is controlled by buckle/clasp side only; never flip one shoe so its toe points the opposite way.'
+      const singleFootSidePairAnalysisLock = `SINGLE-FOOT SIDE PAIR ANALYSIS BY CODE: wornFootSide=${wornFootSide}; displayShoeSide=${displayShoeSide}; wornShoeBuckleSide=${wornBuckleSide}; displayShoeBuckleSide=${displayBuckleSide}. If the worn shoe is ${wornFootSide}, the display shoe must be ${displayShoeSide}; do not generate the display shoe as the same ${wornFootSide} side. The two shoes must be an opposite left/right pair while their toe/front directions remain the same.`
+      const singleFootIndependentShoeMap = [
+        'SINGLE-FOOT INDEPENDENT SHOE MAP BY CODE:',
+        `S1 WORN x1 = product shoe on footX1; ${formatShoeBox(wornShoeBox)}; ${formatAxis(wornShoeAxis)}; shoeSide=${wornFootSide}; buckleSide=${wornBuckleSide}.`,
+        `S2 DISPLAY x1 = bare product display shoe only; ${formatShoeBox(displayShoeBox)}; ${formatAxis(displayShoeAxis, sharedToeDirection)}; shoeSide=${displayShoeSide}; buckleSide=${displayBuckleSide}.`,
+        `S2 toeDirection must equal S1 toeDirection (${sharedToeDirection}). S2 must be the opposite left/right side from S1, but must not reverse toe/front direction.`,
+        'SINGLE-FOOT PAIR GUIDE VISUAL RULE: the small pair-guide panel in the control image only explains left/right shoe pairing, same toe direction, and opposite buckle side. It must not control final shoe color, material, texture, lighting, background, or photographic style.',
+      ].join('\n')
+      const singleFootEvidence = layoutSaysSingleFoot
+        ? 'The cleaned control layout already reports blueLegFootRegionCount=1.'
+        : `This is the dedicated single-foot upload channel; raw blue fragments were ${blueFootComponents.length}, but fragments inside one foot/ankle region must still be treated as footX1.`
+      const singleFootLines = [
+        ...singleFootBaseLines,
+        `singleFootCodeCount = ${footCountLabel}`,
+        singleFootDetected
+          ? `SINGLE-FOOT SINGLE-VISIBLE-FOOT LOCK: this upload channel never represents double feet. ${singleFootEvidence} Treat every broken blue fragment inside the same B/foot area as one visible worn foot only: footX1. Generate only one foot/leg wearing one product shoe. If any S object is marked WORN x2 or representedShoeCount=2, split it as wornShoeCount=1 + displayShoeCount=1: one product shoe on footX1, and one bare display shoe with no foot/leg/skin/sock/toes inside. Do not generate two worn feet.`
+          : `The code detected ${blueFootComponents.length} blue foot/leg regions. Follow this count exactly; do not add extra feet beyond the detected blue regions.`,
+        `SINGLE-FOOT CAMERA DESCRIPTION BY CODE: ${cameraLock}`,
+        singleFootCameraSideLock,
+        singleFootToeDirectionLock,
+        singleFootSidePairAnalysisLock,
+        singleFootIndependentShoeMap,
+      ].filter(Boolean)
+      const singleFootLayout = forceSingleFootLayout(cleaned.layout, singleFootDetected, {
+        cameraViewValue: singleFootCameraViewValue,
+        cameraLockLine: singleFootCameraLockLine,
+        pairAnalysisLine: singleFootSidePairAnalysisLock,
+      })
+      const orderedSingleFootLayout = [singleFootLines.join('\n'), singleFootLayout].filter(Boolean).join('\n\n')
+
+      if (!cleaned.file) {
+        return {
+          ...cleaned,
+          layout: orderedSingleFootLayout,
+        }
+      }
+
+      const controlBitmap = await createImageBitmap(cleaned.file)
+      const controlCanvas = document.createElement('canvas')
+      controlCanvas.width = controlBitmap.width
+      controlCanvas.height = controlBitmap.height
+      const control = controlCanvas.getContext('2d')
+      if (!control) {
+        return {
+          ...cleaned,
+          layout: orderedSingleFootLayout,
+        }
+      }
+      control.drawImage(controlBitmap, 0, 0)
+      const drawSingleFootPairGuide = () => {
+        const panelWidth = Math.min(controlCanvas.width - 16, Math.max(360, Math.round(controlCanvas.width * 0.48)))
+        const panelHeight = Math.max(108, Math.round(controlCanvas.width * 0.13))
+        const x = Math.max(8, controlCanvas.width - panelWidth - 8)
+        const y = Math.max(8, controlCanvas.height - panelHeight - 8)
+        control.save()
+        control.fillStyle = 'rgba(5, 5, 5, 0.88)'
+        control.fillRect(x, y, panelWidth, panelHeight)
+        control.strokeStyle = '#ffffff'
+        control.lineWidth = Math.max(2, Math.round(controlCanvas.width * 0.0025))
+        control.strokeRect(x + 4, y + 4, panelWidth - 8, panelHeight - 8)
+        const fontSize = Math.max(11, Math.round(controlCanvas.width * 0.014))
+        control.font = `bold ${fontSize}px Arial`
+        control.fillStyle = '#ffffff'
+        control.textBaseline = 'top'
+        control.fillText('SINGLE-FOOT PAIR GUIDE: same toe direction, opposite buckle side', x + 12, y + 10)
+        const shoeY = y + Math.round(panelHeight * 0.48)
+        const shoeW = Math.round(panelWidth * 0.28)
+        const shoeH = Math.max(18, Math.round(panelHeight * 0.22))
+        const firstX = x + Math.round(panelWidth * 0.14)
+        const secondX = x + Math.round(panelWidth * 0.58)
+        const drawShoeSymbol = (centerX: number, label: string, buckleSide: string) => {
+          control.strokeStyle = '#ffffff'
+          control.fillStyle = 'rgba(255,255,255,0.12)'
+          control.lineWidth = Math.max(2, Math.round(controlCanvas.width * 0.002))
+          control.beginPath()
+          control.roundRect(centerX - shoeW / 2, shoeY, shoeW, shoeH, Math.max(6, shoeH * 0.45))
+          control.fill()
+          control.stroke()
+          control.beginPath()
+          control.moveTo(centerX - shoeW / 2 + 8, shoeY + shoeH * 0.5)
+          control.lineTo(centerX + shoeW / 2 - 8, shoeY + shoeH * 0.5)
+          control.stroke()
+          const buckleX = buckleSide === 'viewer-right' ? centerX + shoeW * 0.22 : centerX - shoeW * 0.22
+          control.fillStyle = '#ffffff'
+          control.fillRect(buckleX - 4, shoeY + shoeH * 0.5 - 4, 8, 8)
+          control.fillText(label, centerX - shoeW / 2, shoeY + shoeH + 8)
+          control.fillText(`buckle ${buckleSide.replace('viewer-', '')}`, centerX - shoeW / 2, shoeY + shoeH + 8 + fontSize + 2)
+        }
+        drawShoeSymbol(firstX, `S1 WORN ${wornFootSide}`, wornBuckleSide === 'viewer-right' ? 'viewer-right' : 'viewer-left')
+        drawShoeSymbol(secondX, `S2 DISPLAY ${displayShoeSide}`, displayBuckleSide === 'viewer-right' ? 'viewer-right' : 'viewer-left')
+        control.strokeStyle = '#ffffff'
+        control.lineWidth = Math.max(2, Math.round(controlCanvas.width * 0.002))
+        const arrowY = y + Math.round(panelHeight * 0.34)
+        control.beginPath()
+        control.moveTo(x + Math.round(panelWidth * 0.18), arrowY)
+        control.lineTo(x + Math.round(panelWidth * 0.82), arrowY)
+        control.stroke()
+        control.beginPath()
+        control.moveTo(x + Math.round(panelWidth * 0.82), arrowY)
+        control.lineTo(x + Math.round(panelWidth * 0.79), arrowY - 7)
+        control.lineTo(x + Math.round(panelWidth * 0.79), arrowY + 7)
+        control.closePath()
+        control.fill()
+        control.fillText(`toeDirection same: ${sharedToeDirection}`, x + 12, y + panelHeight - fontSize - 10)
+        control.restore()
+      }
+      const drawInferredShoeBox = (component: SingleFootComponent | null | undefined, label: string) => {
+        if (!component) return
+        control.save()
+        control.strokeStyle = '#ffffff'
+        control.fillStyle = '#ffffff'
+        control.lineWidth = Math.max(3, Math.round(controlCanvas.width * 0.004))
+        control.strokeRect(
+          Math.max(0, component.minX - 6),
+          Math.max(0, component.minY - 6),
+          Math.min(controlCanvas.width - component.minX, component.maxX - component.minX + 13),
+          Math.min(controlCanvas.height - component.minY, component.maxY - component.minY + 13),
+        )
+        control.font = `bold ${Math.max(15, Math.round(controlCanvas.width * 0.022))}px Arial`
+        control.textBaseline = 'top'
+        control.strokeStyle = '#050505'
+        control.lineWidth = Math.max(3, Math.round(controlCanvas.width * 0.003))
+        const x = Math.min(controlCanvas.width - 180, Math.max(8, component.minX + 8))
+        const y = Math.min(controlCanvas.height - 32, Math.max(8, component.minY + 8))
+        control.strokeText(label, x, y)
+        control.fillText(label, x, y)
+        control.restore()
+      }
+      drawInferredShoeBox(inferredSingleFootShoes?.worn, 'S1 WORN x1')
+      drawInferredShoeBox(inferredSingleFootShoes?.display, 'S2 DISPLAY x1')
+      drawSingleFootPairGuide()
+      if (singleFootDetected) {
+        control.fillStyle = 'rgba(5, 5, 5, 0.86)'
+        const overlayWidth = controlCanvas.width - 16
+        const overlayHeight = Math.max(112, Math.round(controlCanvas.width * 0.14))
+        control.fillRect(8, 8, overlayWidth, overlayHeight)
+        control.fillStyle = '#ffffff'
+        const overlayFontSize = Math.max(15, Math.round(controlCanvas.width * 0.022))
+        control.font = `bold ${overlayFontSize}px Arial`
+        control.textBaseline = 'top'
+        const drawOverlayLine = (text: string, lineIndex: number) => {
+          const lineY = 16 + lineIndex * Math.max(overlayFontSize + 4, Math.round(controlCanvas.width * 0.028))
+          let fontSize = overlayFontSize
+          control.font = `bold ${fontSize}px Arial`
+          while (control.measureText(text).width > overlayWidth - 20 && fontSize > 11) {
+            fontSize -= 1
+            control.font = `bold ${fontSize}px Arial`
+          }
+          control.fillText(text, 18, Math.min(lineY, 8 + overlayHeight - fontSize - 6))
+        }
+        drawOverlayLine('S worn x2 override: footX1 + displayX1', 0)
+        drawOverlayLine('only one visible worn foot', 1)
+        drawOverlayLine(`${overheadSingleFootCamera ? 'top-down' : eyeLevelSingleFootCamera ? 'side-view' : 'single-foot'}: worn=${wornFootSide}, display=${displayShoeSide}`, 2)
+      }
+      control.fillStyle = '#ffffff'
+      control.strokeStyle = '#050505'
+      control.lineWidth = Math.max(3, Math.round(controlCanvas.width * 0.004))
+      control.font = `bold ${Math.max(17, Math.round(controlCanvas.width * 0.026))}px Arial`
+      control.textBaseline = 'top'
+      const labelBlue = singleFootDetected ? (mergedBlueFootComponent || blueFootComponents[0]) : null
+      if (labelBlue) {
+        const x = Math.min(controlCanvas.width - 120, Math.max(8, labelBlue.minX + 8))
+        const y = Math.min(controlCanvas.height - 36, Math.max(8, labelBlue.minY + Math.round(controlCanvas.width * 0.052)))
+        control.strokeText('footX1', x, y)
+        control.fillText('footX1', x, y)
+      } else {
+        control.strokeText(footCountLabel, 12, 12)
+        control.fillText(footCountLabel, 12, 12)
+      }
+      const blob = await canvasToBlob(controlCanvas, 'image/png')
+      if (!blob) {
+        return {
+          ...cleaned,
+          layout: orderedSingleFootLayout,
+        }
+      }
+      const fileName = cleaned.file.name.replace(/\.[^.]+$/, '') || 'single-foot-angle-control'
+      return {
+        file: new File([blob], `${fileName}-single-foot.png`, { type: 'image/png' }),
+        layout: orderedSingleFootLayout,
+      }
+    } catch {
+      return {
+        ...cleaned,
+        layout: [cleaned.layout, singleFootBaseLines.join('\n')].filter(Boolean).join('\n\n'),
+      }
     }
   }
 
@@ -3960,6 +4554,7 @@ function App() {
       model: { maxSide: 1400, quality: 0.84, type: 'image/jpeg' },
       angle: { maxSide: 768, quality: 0.92, type: 'image/png' },
       angleHand: { maxSide: 768, quality: 0.92, type: 'image/png' },
+      angleSingle: { maxSide: 768, quality: 0.92, type: 'image/png' },
     }[role]
     try {
       const bitmap = await createImageBitmap(file)
@@ -4036,6 +4631,11 @@ function App() {
         source: 'hand' as const,
         label: (mergeImageFiles.angleHand || []).length > 1 ? `角度参考图（含手） ${index + 1}` : '角度参考图（含手）',
       })),
+      ...(mergeImageFiles.angleSingle || []).map((file, index) => ({
+        file,
+        source: 'single' as const,
+        label: (mergeImageFiles.angleSingle || []).length > 1 ? `角度参考图（单脚） ${index + 1}` : '角度参考图（单脚）',
+      })),
     ].slice(0, mergeAngleBatchLimit)
     const modelFile = (mergeImageFiles.model || [])[0]
     const selectedLibraryAngles = selectedMergeAngleIds
@@ -4068,10 +4668,14 @@ function App() {
       label: string
       url: string
       uploadedFile: File | null
-      uploadedAngleKind?: 'standard' | 'hand'
+      uploadedAngleKind?: 'standard' | 'hand' | 'single'
     }> = uploadedAngleItems.length > 0
       ? uploadedAngleItems.map((item, index) => ({
-          id: item.source === 'hand' ? `uploaded-angle-hand-${index + 1}` : `uploaded-angle-${index + 1}`,
+          id: item.source === 'hand'
+            ? `uploaded-angle-hand-${index + 1}`
+            : item.source === 'single'
+              ? `uploaded-angle-single-${index + 1}`
+              : `uploaded-angle-${index + 1}`,
           label: item.label,
           url: '',
           uploadedFile: item.file,
@@ -4090,12 +4694,13 @@ function App() {
       for (const angleItem of generationAngles) {
         const angleFile = angleItem.uploadedFile || await fileFromAsset(angleItem.url, `${angleItem.id}.png`)
         const isHandAngleUpload = angleItem.uploadedFile && angleItem.uploadedAngleKind === 'hand'
+        const isSingleFootAngleUpload = angleItem.uploadedFile && angleItem.uploadedAngleKind === 'single'
         const useHandAngleControl = Boolean(isHandAngleUpload)
         const cleanedAngleControl = angleItem.uploadedFile
           ? useHandAngleControl
             ? await buildHandAngleControl(angleFile)
-            : isHandAngleUpload
-              ? null
+            : isSingleFootAngleUpload
+              ? await buildSingleFootAngleControl(angleFile)
               : await buildCleanedAngleControl(angleFile)
           : null
         const uploadedAngleIsRealPhoto = Boolean(angleItem.uploadedFile && cleanedAngleControl && !cleanedAngleControl.file)
@@ -4107,6 +4712,7 @@ function App() {
           ? buildUploadedAngleGenerationPrompt([
               uploadedAngleIsRealPhoto ? 'REAL PHOTO ANGLE REFERENCE' : '',
               useHandAngleControl ? 'USER UPLOADED ANGLE REFERENCE WITH HANDS: use the dedicated hand-angle control image and hand-angle layout text for this channel. Yellow/S regions are shoes, green/G regions are explicit hands, blue/B regions are legs/feet/ankles only, red/R regions are clothing. Follow the S/B/G/R classifications exactly. A green/G HAND touching or holding a shoe makes that shoe hand-held or hand-supported, not automatically worn. A blue/B FOOT/LEG entering or wearing a shoe makes that shoe worn.' : '',
+              isSingleFootAngleUpload ? 'USER UPLOADED SINGLE-FOOT ANGLE REFERENCE: use the dedicated single-foot control addendum in the angle layout. If the code layout says footX1 / singleFootCodeCount = footX1, generate exactly one visible worn foot/leg only. Display shoes must stay bare product shoes with no foot, ankle, leg, sock, or skin inside. Follow the single-foot camera description by code: when first-person downward POV / top-down is detected, the camera must look down from above at the foot planted on the floor/ground plane, not an eye-level or side product view; when eye-level side-view is detected, keep that side-view camera. Do not invent a second worn foot to balance the image.' : '',
               uploadedAngleSmartAnalysis,
             ].filter(Boolean).join('\n'))
           : ''
@@ -4120,11 +4726,15 @@ function App() {
           'Lower-body-only framing: never generate the model face, head, portrait, or full upper body. Keep the crop focused on shoes, feet, legs, hands if present in the angle mask, and only the clothing portion required around the lower body.',
           isHandAngleUpload
             ? 'The dedicated hand-angle control image plus hand-angle layout text must dominate pose and camera: yellow/S controls shoe placement and role; green/G controls explicit hand/wrist/finger regions; blue/B controls leg/foot/ankle regions only; red/R controls clothing. Follow each S/B/G/R classification exactly and do not use the normal angle-reference code logic or normal angle-reference prompt rules for this hand-angle channel.'
+            : isSingleFootAngleUpload
+            ? 'The single-foot angle control image plus code-generated structure analysis must dominate pose, camera, and shoe layout. Preserve the uploaded single-foot composition: when the code control marks footX1, generate only one visible worn foot/leg, and keep any other detected shoes as display shoes only. Do not add a second worn foot, do not convert display shoes into worn shoes, and keep the camera/crop focused on the product shoe. If the code says first-person downward POV / top-down, the camera must be above the wearer looking down at the foot planted on the floor/ground plane, with the display shoe lying on the same floor; never convert it to eye-level, side-view, front-view, floating-foot, or standing catalog camera. If the code says eye-level or low side-view, keep that side-view camera.'
             : uploadedAngleIsRealPhoto
             ? 'The uploaded real angle photo must dominate pose and camera: shoe count, shoe placement, shoe direction, toe direction, heel direction, shoe angle, body-facing direction, foot/leg/hand/arm pose, camera height, lens perspective, scale relationship, crop, overlap, and occlusion must follow the real angle photo rather than the product photo or model photo. Do not convert it into a color-block mask workflow.'
             : 'The angle mask plus code-generated structure analysis must dominate pose and shoe layout: shoe count, shoe placement, shoe direction, toe direction, heel direction, body-facing direction, hand/foot candidate roles, shoe-limb bindings, depth ordering, camera angle, scale relationship, and occlusion must follow the angle reference rather than the product photo or model photo.',
           isHandAngleUpload
             ? 'The product shoe image must dominate shoe identity: replace every yellow/S shoe in the hand-angle control with the exact uploaded product shoe while preserving shoe placement, angle, size, toe direction, heel direction, perspective, worn/display/hand-supported role, hand/foot relationship, and occlusion. The final shoe must match the uploaded product shoe image 100%.'
+            : isSingleFootAngleUpload
+            ? 'The product shoe image must dominate shoe identity: redraw the exact uploaded product shoe according to the single-foot S/yellow placement and angle reference objects. Yellow/S objects only control shoe placement, angle, size, toe direction, heel position, perspective, and worn/display role; they never control shoe exterior appearance, silhouette, color, material, shape, style, sole, heel, toe, straps, buckles, laces, or details. The final shoe must match the uploaded product shoe image 100%.'
             : uploadedAngleIsRealPhoto
             ? 'The product shoe image must dominate shoe identity: replace the shoe identity in the real angle photo with the exact uploaded product shoe while preserving the real photo shoe placement, angle, size, toe direction, heel direction, perspective, worn/display role, hand/foot relationship, and occlusion. The final shoe must match the uploaded product shoe image 100%.'
             : 'The product shoe image must dominate shoe identity: redraw the exact uploaded product shoe according to the S/yellow placement and angle reference objects. Yellow/S objects only control shoe placement, angle, size, toe direction, heel position, perspective, and worn/display role; they never control shoe exterior appearance, silhouette, color, material, shape, style, sole, heel, toe, straps, buckles, laces, or details. The final shoe must match the uploaded product shoe image 100%.',
@@ -4136,13 +4746,13 @@ function App() {
         generateForm.append('brief', effectiveBrief)
         generateForm.append('prompt', prompt)
         generateForm.append('size', outputSize)
-        generateForm.append('angleSource', angleItem.uploadedFile ? (uploadedAngleIsRealPhoto ? 'User uploaded real photo angle reference' : (angleItem.uploadedAngleKind === 'hand' ? 'User uploaded semantic color-block angle reference with hands' : 'User uploaded semantic color-block angle reference')) : `${angleItem.label} / ${angleItem.id}`)
+        generateForm.append('angleSource', angleItem.uploadedFile ? (uploadedAngleIsRealPhoto ? 'User uploaded real photo angle reference' : (angleItem.uploadedAngleKind === 'hand' ? 'User uploaded semantic color-block angle reference with hands' : angleItem.uploadedAngleKind === 'single' ? 'User uploaded semantic color-block single-foot angle reference' : 'User uploaded semantic color-block angle reference')) : `${angleItem.label} / ${angleItem.id}`)
         generateForm.append('angleLayout', angleLayoutBrief)
         sharedFiles.forEach(({ image, name }) => generateForm.append('images', image, name))
         if (cleanedAngleControl?.file) {
           generateForm.append('images', cleanedAngleControl.file, `merge-angle-control-${cleanedAngleControl.file.name}`)
         }
-        generateForm.append('images', await compressMergeReferenceFile(angleFile, 'angle'), `${angleItem.uploadedAngleKind === 'hand' ? 'merge-angle-hand' : 'merge-angle'}-${angleFile.name}`)
+        generateForm.append('images', await compressMergeReferenceFile(angleFile, 'angle'), `${angleItem.uploadedAngleKind === 'hand' ? 'merge-angle-hand' : angleItem.uploadedAngleKind === 'single' ? 'merge-angle-single' : 'merge-angle'}-${angleFile.name}`)
         const generateResponse = await fetch('/api/run/merge-image-generate', {
           method: 'POST',
           body: generateForm,
@@ -5786,7 +6396,7 @@ function App() {
                                   <input
                                     type="file"
                                     accept="image/*"
-                                    multiple={slot.id === 'angle' || slot.id === 'angleHand'}
+                                    multiple={isMergeAngleUploadSlot(slot.id)}
                                     onChange={(event) => {
                                       selectMergeImage(slot.id, event.currentTarget.files)
                                       event.currentTarget.value = ''
@@ -5796,11 +6406,11 @@ function App() {
                                 {slotFiles.length > 0 && (
                                   <button
                                     type="button"
-                                    className={`slot-preview ${(slot.id === 'angle' || slot.id === 'angleHand') && slotFiles.length > 1 ? 'slot-preview-stack' : ''}`}
+                                    className={`slot-preview ${isMergeAngleUploadSlot(slot.id) && slotFiles.length > 1 ? 'slot-preview-stack' : ''}`}
                                     onClick={() => {
-                                      if ((slot.id === 'angle' || slot.id === 'angleHand') && slotFiles.length > 1) setMergeReferenceModalSlot(slot.id)
+                                      if (isMergeAngleUploadSlot(slot.id) && slotFiles.length > 1) setMergeReferenceModalSlot(slot.id)
                                     }}
-                                    aria-label={(slot.id === 'angle' || slot.id === 'angleHand') && slotFiles.length > 1 ? `查看全部${slot.label}` : `${slot.label}预览`}
+                                    aria-label={isMergeAngleUploadSlot(slot.id) && slotFiles.length > 1 ? `查看全部${slot.label}` : `${slot.label}预览`}
                                   >
                                     {slotFiles.map((file, index) => (
                                       <figure className="slot-preview-item" key={`${file.name}-${index}`}>
@@ -5808,7 +6418,7 @@ function App() {
                                           src={mergeImagePreviewUrls[`${slot.id}-${index}`]}
                                           alt={`${slot.label}预览 ${index + 1}`}
                                         />
-                                        {((slot.id !== 'angle' && slot.id !== 'angleHand') || slotFiles.length === 1) && (
+                                        {(!isMergeAngleUploadSlot(slot.id) || slotFiles.length === 1) && (
                                           <span
                                             className="slot-preview-remove"
                                             role="button"
@@ -5832,7 +6442,7 @@ function App() {
                                         )}
                                       </figure>
                                     ))}
-                                    {(slot.id === 'angle' || slot.id === 'angleHand') && slotFiles.length > 1 && <span className="slot-preview-count">{slotFiles.length}</span>}
+                                    {isMergeAngleUploadSlot(slot.id) && slotFiles.length > 1 && <span className="slot-preview-count">{slotFiles.length}</span>}
                                   </button>
                                 )}
                               </section>
@@ -6884,6 +7494,7 @@ function App() {
         loading={projectsLoading}
         projects={projects}
         onClose={() => setProjectsOpen(false)}
+        onRefresh={refreshProjectsPanel}
         onOpenLightbox={openLightbox}
         onDownload={(imageUrl, title) => downloadImage(imageUrl, title)}
         onDownloadMany={downloadImages}
@@ -7141,10 +7752,10 @@ function App() {
 
       {mergeReferenceModalSlot && (
         <div className="merge-reference-modal-backdrop" role="presentation" onClick={() => setMergeReferenceModalSlot('')}>
-          <section className="merge-reference-modal" role="dialog" aria-modal="true" aria-label={`${mergeReferenceModalSlot === 'angleHand' ? '角度参考图（含手）' : '角度参考图'}管理`} onClick={(event) => event.stopPropagation()}>
+          <section className="merge-reference-modal" role="dialog" aria-modal="true" aria-label={`${mergeReferenceSlotLabel(mergeReferenceModalSlot)}管理`} onClick={(event) => event.stopPropagation()}>
             <header>
               <div>
-                <strong>{mergeReferenceModalSlot === 'angleHand' ? '角度参考图（含手）' : '角度参考图'}</strong>
+                <strong>{mergeReferenceSlotLabel(mergeReferenceModalSlot)}</strong>
                 <span>{(mergeImageFiles[mergeReferenceModalSlot] || []).length} 张参考图，将共用产品鞋图、背景图和模特参考图分别生成。</span>
               </div>
               <button type="button" aria-label="关闭" onClick={() => setMergeReferenceModalSlot('')}>
@@ -7154,11 +7765,11 @@ function App() {
             <div className="merge-reference-modal-grid">
               {(mergeImageFiles[mergeReferenceModalSlot] || []).map((file, index) => (
                 <figure key={`${file.name}-${index}`}>
-                  <img src={mergeImagePreviewUrls[`${mergeReferenceModalSlot}-${index}`]} alt={`${mergeReferenceModalSlot === 'angleHand' ? '角度参考图（含手）' : '角度参考图'} ${index + 1}`} />
+                  <img src={mergeImagePreviewUrls[`${mergeReferenceModalSlot}-${index}`]} alt={`${mergeReferenceSlotLabel(mergeReferenceModalSlot)} ${index + 1}`} />
                   <button type="button" onClick={() => removeMergeImage(mergeReferenceModalSlot, index)}>
                     ×
                   </button>
-                  <figcaption>{mergeReferenceModalSlot === 'angleHand' ? '含手角度' : '角度'} {index + 1}</figcaption>
+                  <figcaption>{mergeReferenceSlotLabel(mergeReferenceModalSlot)} {index + 1}</figcaption>
                 </figure>
               ))}
               {(mergeImageFiles[mergeReferenceModalSlot] || []).length < mergeAngleBatchLimit && (
@@ -7174,7 +7785,7 @@ function App() {
                   }}
                 >
                   <span className="slot-plus" aria-hidden="true" />
-                  <strong>{mergeReferenceModalSlot === 'angleHand' ? '添加含手角度图' : '添加角度图'}</strong>
+                  <strong>添加{mergeReferenceSlotLabel(mergeReferenceModalSlot)}</strong>
                   <small>点击上传或拖入图片</small>
                   <input
                     type="file"

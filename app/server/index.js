@@ -398,7 +398,7 @@ function extractConciseAngleLayout(angleLayout = '') {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
-  const keepPattern = /HAND ANGLE CONTROL|SHOE\/YELLOW MAP|BLUE LEG\/FOOT MAP|BLUE HAND-OR-LEG|GREEN HAND MAP|RED CLOTHING MAP|greenHandCount|mainShoeObjectCount|blueHandOrLegCandidateCount|blueHandCount|blueFootLegCount|instanceRoleSplit|instanceSubregions|mixed-role|VISIBLE TWO-SHOE LEFT\/RIGHT PAIR LOCK|VISIBLE MULTI-SHOE PAIRING LOCK|CONTROL IMAGE EXPLANATION|Dynamic explanation|Visual warning|For this image|S object explanation|B object explanation|G object explanation|R object explanation|Generation instruction from this explanation|STRUCTURED ANGLE SCHEMA|poseType|mainShoeCount|wornShoeCount|handheldOrHandSupported|standaloneDisplay|blueLegFoot|blueHand|greenHand|redClothing|cameraView|cropFocus|wornShoes|handheldOrHandSupportedShoes|standaloneDisplayShoes|DEPTH LAYER MAP|CLOTHING REGION MAP|SKELETON MAP|HAND FOOT CANDIDATES|SHOE LIMB BINDINGS|BODY DIRECTION LOCK|CAMERA LOCK|CODE CONTROL SCOPE|Clothing rule|Product-shoe crop rule|Final image must not show|control colors|mask colors|flat color-block|gray|grey|^S\d+:|^B\d+:|^G\d+:|^R\d+:|^Layer|^Skeleton|^Candidate|^Binding/i
+  const keepPattern = /HAND ANGLE CONTROL|SINGLE-FOOT ANGLE CHANNEL|singleFootCodeCount|SINGLE-FOOT SINGLE-VISIBLE-FOOT LOCK|SINGLE-FOOT CAMERA DESCRIPTION BY CODE|SINGLE-FOOT CAMERA SIDE LOCK BY CODE|SINGLE-FOOT TOE DIRECTION SAME LOCK BY CODE|SINGLE-FOOT SIDE PAIR ANALYSIS BY CODE|SINGLE-FOOT INDEPENDENT SHOE MAP BY CODE|SINGLE-FOOT PAIR GUIDE VISUAL RULE|S1 WORN x1|S2 DISPLAY x1|S2 toeDirection|toeDirection|single-foot override|footX1|SHOE\/YELLOW MAP|BLUE LEG\/FOOT MAP|BLUE HAND-OR-LEG|GREEN HAND MAP|RED CLOTHING MAP|greenHandCount|mainShoeObjectCount|blueHandOrLegCandidateCount|blueHandCount|blueFootLegCount|instanceRoleSplit|instanceSubregions|mixed-role|VISIBLE TWO-SHOE LEFT\/RIGHT PAIR LOCK|VISIBLE MULTI-SHOE PAIRING LOCK|CONTROL IMAGE EXPLANATION|Dynamic explanation|Visual warning|For this image|S object explanation|B object explanation|G object explanation|R object explanation|Generation instruction from this explanation|STRUCTURED ANGLE SCHEMA|poseType|mainShoeCount|wornShoeCount|handheldOrHandSupported|standaloneDisplay|blueLegFoot|blueHand|greenHand|redClothing|cameraView|cropFocus|wornShoes|handheldOrHandSupportedShoes|standaloneDisplayShoes|DEPTH LAYER MAP|CLOTHING REGION MAP|SKELETON MAP|HAND FOOT CANDIDATES|SHOE LIMB BINDINGS|BODY DIRECTION LOCK|CAMERA LOCK|CODE CONTROL SCOPE|Clothing rule|Product-shoe crop rule|Final image must not show|control colors|mask colors|flat color-block|gray|grey|^S\d+:|^B\d+:|^G\d+:|^R\d+:|^Layer|^Skeleton|^Candidate|^Binding/i
   const kept = []
   let inSchema = false
   for (const line of lines) {
@@ -451,6 +451,7 @@ function buildHardAngleLayoutSummary(angleLayout = '') {
     .filter(Boolean)
   if (!lines.some((line) => /STRUCTURED ANGLE SCHEMA|HAND ANGLE CONTROL/i.test(line))) return ''
   const isHandAngleControl = lines.some((line) => /HAND ANGLE CONTROL/i.test(line))
+  const isSingleFootControl = lines.some((line) => /SINGLE-FOOT ANGLE CHANNEL|singleFootCodeCount\s*=\s*footX1|single-foot override/i.test(line))
 
   const valueFor = (key) => {
     const pattern = new RegExp(`^${key}\\s*=\\s*(.+)$`, 'i')
@@ -475,12 +476,20 @@ function buildHardAngleLayoutSummary(angleLayout = '') {
   const wornShoes = valueFor('wornShoes')
   const handShoes = valueFor('handheldOrHandSupportedShoes')
   const displayShoes = valueFor('standaloneDisplayShoes')
-  const shoeLines = pickLines(/^(S object explanation|S\d+:|Binding S\d+:|SHOE\/YELLOW MAP)/i, 14)
+  const normalizeSingleFootRoleList = (value) => isSingleFootControl ? String(value || '').replace(/\sx\d+/gi, ' x1') : value
+  const normalizedWornShoes = normalizeSingleFootRoleList(wornShoes)
+  const normalizedDisplayShoes = normalizeSingleFootRoleList(displayShoes)
+  const shoeLines = pickLines(/^(SINGLE-FOOT INDEPENDENT SHOE MAP BY CODE|SINGLE-FOOT PAIR GUIDE VISUAL RULE|S1 WORN x1|S2 DISPLAY x1|S2 toeDirection|S object explanation|S\d+:|Binding S\d+:|SHOE\/YELLOW MAP)/i, 18)
   const bodyLines = pickLines(/^(B object explanation|B\d+:|G object explanation|G\d+:|Skeleton B\d+:|Candidate B\d+|BLUE HAND-OR-LEG|GREEN HAND MAP)/i, 14)
   const clothingLines = pickLines(/^(R object explanation|R\d+:|redClothingRegionCount|Clothing rule|RED CLOTHING MAP)/i, 8)
-  const directionLines = pickLines(/^(BODY DIRECTION LOCK|CAMERA LOCK|VISIBLE TWO-SHOE LEFT\/RIGHT PAIR LOCK|VISIBLE MULTI-SHOE PAIRING LOCK|Product-shoe crop rule|Binding rule|Clothing rule)/i, 10)
+  const directionLines = pickLines(/^(BODY DIRECTION LOCK|CAMERA LOCK|SINGLE-FOOT SINGLE-VISIBLE-FOOT LOCK|SINGLE-FOOT CAMERA DESCRIPTION BY CODE|SINGLE-FOOT CAMERA SIDE LOCK BY CODE|SINGLE-FOOT TOE DIRECTION SAME LOCK BY CODE|SINGLE-FOOT SIDE PAIR ANALYSIS BY CODE|SINGLE-FOOT INDEPENDENT SHOE MAP BY CODE|SINGLE-FOOT PAIR GUIDE VISUAL RULE|S1 WORN x1|S2 DISPLAY x1|S2 toeDirection|VISIBLE TWO-SHOE LEFT\/RIGHT PAIR LOCK|VISIBLE MULTI-SHOE PAIRING LOCK|Product-shoe crop rule|Binding rule|Clothing rule)/i, 18)
   const noClothingLock = isHandAngleControl && clothingCount === '0'
-  const strictPositionLock = isHandAngleControl ? buildStrictPositionLock(angleLayout) : ''
+  const strictPositionLock = (isHandAngleControl || isSingleFootControl) ? buildStrictPositionLock(angleLayout) : ''
+  const singleFootTopDownGroundLock = isSingleFootControl
+    && /first-person downward|true top-down|top-down try-on|camera is above|looking down at the foot/i.test(cameraView)
+    && !/eye-level|side-view|do not convert it to .*top-down|do not add top-down/i.test(cameraView)
+    ? '[MUST] SINGLE-FOOT TOP-DOWN GROUND LOCK: this single-foot reference is a first-person downward photo. The camera must look down from above the wearer at the foot and shoes on the floor/ground plane. The one visible foot wearing the shoe must be planted flat on the floor with contact shadow; the display shoe must also lie on the same floor plane. The worn shoe and display shoe must point their toes/fronts toward the same canvas direction. Do not generate an eye-level, side-view, front-view, standing catalog pose, floating foot, raised leg, or side-profile shoe view.'
+    : ''
 
   return [
     strictPositionLock,
@@ -490,22 +499,29 @@ function buildHardAngleLayoutSummary(angleLayout = '') {
     mainShoeCount
       ? isHandAngleControl
         ? `[MUST] mainShoeCount=${mainShoeCount}; shoeObjectCount=${shoeObjectCount || mainShoeCount}; wornShoeCount=${wornShoeCount || '0'}; handSupportedShoeCount=${handShoeCount || '0'}; standaloneDisplayShoeCount=${displayShoeCount || '0'}. If an S object says x2 or representedShoeCount=2, it represents two actual product shoes inside that one layout object. If mainShoeCount=2, the two visible product shoes must be a matching left-shoe/right-shoe pair, never two same-side shoe copies, regardless of worn/display/hand-supported roles. This shoe-side pairing must not change the coordinate layout, camera, rotation, or toe/heel axis from the control image.`
+        : isSingleFootControl
+          ? `[MUST] SINGLE-FOOT OVERRIDE ACTIVE: this is the dedicated single-foot channel. Generate exactly one visible worn foot/leg (footX1) with exactly one worn product shoe, plus only the detected bare display shoe(s). Raw x2 suffixes from the normal angle parser are not allowed to create two worn feet or four shoes. Use the cleaned single-foot roles instead: wornShoeCount=1; standalone display shoes stay bare. mainShoeCount=${mainShoeCount}; shoeObjectCount=${shoeObjectCount || mainShoeCount}; handSupportedShoeCount=${handShoeCount || '0'}.`
         : `[MUST] mainShoeCount=${mainShoeCount}; shoeObjectCount=${shoeObjectCount || mainShoeCount}; wornShoeCount=${wornShoeCount || '0'}; handSupportedShoeCount=${handShoeCount || '0'}; standaloneDisplayShoeCount=${displayShoeCount || '0'}. If an S object says x2 or representedShoeCount=2, it represents two actual product shoes inside that one layout object.`
       : '',
     legFootCount || handRegionCount || clothingCount ? `[MUST] blueLegFootRegionCount=${legFootCount || '0'}; blueHandRegionCount=${handRegionCount || '0'}; redClothingRegionCount=${clothingCount || '0'}.` : '',
     noClothingLock ? '[MUST] redClothingRegionCount=0 means there is no clothing region in this angle control. Do not generate clothing, garment, skirt hem, pants hem, sleeve, fabric panel, torso, outfit area, or any red/R-region substitute.' : '',
-    wornShoes ? `[MUST] wornShoes=${wornShoes}. Only these shoes may contain a foot, ankle, or leg.` : '',
+    isSingleFootControl ? '[MUST] In this single-foot channel, only footX1 may contain foot, ankle, leg, skin, or toes. Every display shoe must stay bare with no foot/leg inside.' : '',
+    normalizedWornShoes ? (isSingleFootControl
+      ? `[MUST] wornShoes=${normalizedWornShoes}. Only this one worn shoe may contain footX1, ankle, or leg in the single-foot channel.`
+      : `[MUST] wornShoes=${normalizedWornShoes}. Only these shoes may contain a foot, ankle, or leg.`) : '',
     handShoes ? `[MUST] handheldOrHandSupportedShoes=${handShoes}. These shoes may touch hands only; do not turn them into worn shoes.` : '',
-    displayShoes ? `[MUST] standaloneDisplayShoes=${displayShoes}. These are bare product display shoes only; do not add feet, ankles, legs, or body limbs inside or attached to them.` : '',
+    normalizedDisplayShoes ? `[MUST] standaloneDisplayShoes=${normalizedDisplayShoes}. These are bare product display shoes only; do not add feet, ankles, legs, or body limbs inside or attached to them.` : '',
     cameraView ? `[MUST] cameraView=${cameraView}. Do not replace it with a generic eye-level, front, or side catalog camera.` : '',
+    singleFootTopDownGroundLock,
     cropFocus ? `[MUST] cropFocus=${cropFocus}.` : '',
     isHandAngleControl
       ? '[MUST NOT] Do not invent extra shoes, remove detected shoes, swap worn/display roles, convert display shoes into worn shoes, convert hands into legs, duplicate one shoe direction onto both feet, or render two visible shoes as the same left/right side.'
       : '[MUST NOT] Do not invent extra shoes, remove detected shoes, swap worn/display roles, convert display shoes into worn shoes, convert hands into legs, or duplicate one shoe direction onto both feet.',
+    isSingleFootControl && directionLines.length ? 'DIRECTION / BINDING LOCKS:\n' + directionLines.join('\n') : '',
     shoeLines.length ? 'SHOE ROLE MAP:\n' + shoeLines.join('\n') : '',
     bodyLines.length ? 'BODY / LEG / HAND MAP:\n' + bodyLines.join('\n') : '',
     clothingLines.length ? 'CLOTHING R REGION MAP:\n' + clothingLines.join('\n') : '',
-    directionLines.length ? 'DIRECTION / BINDING LOCKS:\n' + directionLines.join('\n') : '',
+    !isSingleFootControl && directionLines.length ? 'DIRECTION / BINDING LOCKS:\n' + directionLines.join('\n') : '',
   ].filter(Boolean).join('\n').slice(0, 5200)
 }
 
@@ -4424,6 +4440,7 @@ app.post('/api/run/merge-image-generate', upload.array('images'), async (req, re
     const mergeImageLockInstruction = buildMergeImageLockInstruction(uploadedFiles, angleSource)
     const hasModelReference = requiredRoles.has('model')
     const hasAngleControlReference = requiredRoles.has('angleControl')
+    const isSingleFootAngleControl = hasAngleControlReference && (/single-foot|single foot|单脚/i.test(String(angleSource || '')) || /SINGLE-FOOT ANGLE CHANNEL|singleFootCodeCount\s*=\s*footX1/i.test(String(angleLayout || '')))
     const conciseAngleLayout = extractConciseAngleLayout(angleLayout)
     const hardAngleLayoutSummary = hasAngleControlReference ? buildHardAngleLayoutSummary(angleLayout) : ''
     const aestheticInstruction = buildMergeImageAestheticInstruction()
@@ -4460,19 +4477,34 @@ app.post('/api/run/merge-image-generate', upload.array('images'), async (req, re
         ].join('\n')
       : ''
     const finalHardLayoutLock = hasAngleControlReference
-      ? [
-          'FINAL HARD LAYOUT LOCK:',
-          'The structured angle schema is authoritative for poseType, mainShoeCount, wornShoeCount, handheldOrHandSupportedShoeCount, standaloneDisplayShoeCount, blueLegFootRegionCount, blueHandRegionCount, redClothingRegionCount, cameraView, cropFocus, depth layer map, clothing region map, skeleton map, hand/foot candidates, shoe-limb bindings, and S/B/R object roles.',
-          'The code-generated control is for angle/depth/pose only; it must not control light, color, texture, material quality, background mood, contrast, or photographic finish.',
-          'Do not convert DISPLAY shoes into worn shoes. Do not convert HAND-supported shoes into worn shoes. Do not convert HAND regions into legs or feet.',
-          'If exactly two product shoes are visible, they must be a natural left-shoe/right-shoe pair. This applies even when one shoe is worn and the other is display or hand-supported. Never generate two shoes from the same side or duplicate the same shoe direction onto both shoes. This shoe-side pairing must not change the coordinate layout, camera, rotation, placement, scale, or toe/heel axis from the control image.',
-          'Red clothing regions are only lower-body outfit support. They must not introduce the model face, head, portrait, torso, or full upper body.',
-          'Aim the camera and crop at the product shoes. The product shoes must be the largest, sharpest, clearest subject; show only shoes, feet, lower legs, hands if detected, and required clothing hem/partial lower garment.',
-          'Keep relative coordinates on the X0-X100/Y0-Y100 layout: shoe centers, body origin, limb centers, clothing area, and background boundaries must remain in the same relative places.',
-          'If multiple worn shoes are present, they must remain the left-foot/right-foot pair from the foot-side map, with each shoe preserving its own toe/heel endpoint direction. Never duplicate one shoe direction onto both feet and never swap left/right.',
-          'If only one worn shoe is present, generate only that one visible foot/shoe and do not invent a second worn foot.',
-          'After satisfying layout roles, still render the final result as premium realistic commercial photography with natural lighting and material quality.',
-        ].join('\n')
+      ? isSingleFootAngleControl
+        ? [
+            'FINAL HARD LAYOUT LOCK - SINGLE-FOOT CHANNEL ONLY:',
+            'This is the dedicated single-foot angle reference channel. The single-foot code layout overrides generic angle-control shoe-count and multi-worn-shoe rules.',
+            'Generate exactly one visible worn foot/leg: footX1. Only one product shoe may be worn on footX1. Every other detected product shoe is a bare display shoe with no foot, ankle, leg, skin, sock, or toes inside.',
+            'Follow SINGLE-FOOT INDEPENDENT SHOE MAP BY CODE before any generic S x2 wording: S1 WORN x1 is the worn shoe object with its own bbox and toeDirection; S2 DISPLAY x1 is the bare display shoe object with its own bbox and toeDirection.',
+            'Ignore raw x2 suffixes from the normal parser when they conflict with the single-foot layout. Do not turn S1 x2 or S2 x2 into two worn feet, four shoes, or a second leg. Use the cleaned single-foot role text and coordinates.',
+            'The cameraView from the single-foot code layout is authoritative. If it says eye-level or low side-view, do not add top-down, first-person downward, overhead, flat-lay, or ground-plane camera rules. If it says first-person downward/top-down, only then use the top-down grounded-foot rule.',
+            'Follow SINGLE-FOOT SIDE PAIR ANALYSIS BY CODE exactly: if wornFootSide=RIGHT then displayShoeSide must be LEFT; if wornFootSide=LEFT then displayShoeSide must be RIGHT. The display shoe must never be generated as the same left/right side as the worn shoe.',
+            'The worn shoe and the bare display shoe must preserve their S object coordinates, scale, perspective, and toe/front direction from the control image. If a left/right shoe pair is required, distinguish the pair by buckle/clasp side, not by reversing one shoe toe direction.',
+            'The worn shoe and display shoe must point their toes/fronts toward the same canvas direction. Do not flip one shoe front-to-back to satisfy left/right pairing; only the buckle/clasp side changes.',
+            'Red clothing regions are only lower-body outfit support. They must not introduce the model face, head, portrait, torso, or full upper body.',
+            'Aim the camera and crop at the product shoes. The product shoes must be the largest, sharpest, clearest subject; show only shoes, the one foot/leg, and required clothing hem/partial lower garment.',
+            'After satisfying the single-foot layout, still render the final result as premium realistic commercial photography with natural lighting and material quality.',
+          ].join('\n')
+        : [
+            'FINAL HARD LAYOUT LOCK:',
+            'The structured angle schema is authoritative for poseType, mainShoeCount, wornShoeCount, handheldOrHandSupportedShoeCount, standaloneDisplayShoeCount, blueLegFootRegionCount, blueHandRegionCount, redClothingRegionCount, cameraView, cropFocus, depth layer map, clothing region map, skeleton map, hand/foot candidates, shoe-limb bindings, and S/B/R object roles.',
+            'The code-generated control is for angle/depth/pose only; it must not control light, color, texture, material quality, background mood, contrast, or photographic finish.',
+            'Do not convert DISPLAY shoes into worn shoes. Do not convert HAND-supported shoes into worn shoes. Do not convert HAND regions into legs or feet.',
+            'If exactly two product shoes are visible, they must be a natural left-shoe/right-shoe pair. This applies even when one shoe is worn and the other is display or hand-supported. Never generate two shoes from the same side or duplicate the same shoe direction onto both shoes. This shoe-side pairing must not change the coordinate layout, camera, rotation, placement, scale, or toe/heel axis from the control image.',
+            'Red clothing regions are only lower-body outfit support. They must not introduce the model face, head, portrait, torso, or full upper body.',
+            'Aim the camera and crop at the product shoes. The product shoes must be the largest, sharpest, clearest subject; show only shoes, feet, lower legs, hands if detected, and required clothing hem/partial lower garment.',
+            'Keep relative coordinates on the X0-X100/Y0-Y100 layout: shoe centers, body origin, limb centers, clothing area, and background boundaries must remain in the same relative places.',
+            'If multiple worn shoes are present, they must remain the left-foot/right-foot pair from the foot-side map, with each shoe preserving its own toe/heel endpoint direction. Never duplicate one shoe direction onto both feet and never swap left/right.',
+            'If only one worn shoe is present, generate only that one visible foot/shoe and do not invent a second worn foot.',
+            'After satisfying layout roles, still render the final result as premium realistic commercial photography with natural lighting and material quality.',
+          ].join('\n')
       : ''
     const finalPrompt = [
       hardAngleLayoutSummary,
