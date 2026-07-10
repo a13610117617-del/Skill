@@ -481,6 +481,16 @@ const mergeAnglePosePrompts: Record<string, string> = {
   'angle-15': 'Selected pose prompt: seated cross-leg shoe-try-on pose with scattered foreground shoes. The model should read as a seated cross-leg try-on posture, as if supported outside the frame, never sitting on the floor, with one leg crossed over the other, creating a bent-knee try-on posture. Do not add a visible stool, bench, chair, platform, or support object unless it is clearly required by the selected angle image. Follow the selected angle image for camera angle and crop: if the angle image only shows skirt hem, legs, shoes, and scattered foreground shoes, do not force a full upper body unless the output is horizontal and needs extra framing. The worn product shoe on the main crossed or forward foot is the key display shoe; any scattered foreground shoes are only ground/display shoes and must not create additional legs. Preserve the seated posture feeling, leg crossing, ankle relationship, shoe angle, low side/front camera view, and spatial relationship shown in the angle image.',
 }
 
+const mergeAngleAddedPosePrompts: Record<string, string> = {
+  'angle-17': 'Selected pose prompt / 选定姿势提示：侧面低机位近景。模特下半身从画面上方进入，模特左脚穿着鞋站立，鞋头朝左；右脚在画面外，不要生成右脚或第二只穿鞋的脚。右边的展示鞋是靠近镜头的前景那只鞋，没有脚穿着，只是放在左脚旁边作为展示鞋，位置在前景偏右下方，鞋头同样朝左。整体是左脚试穿加右侧前景展示鞋的构图，裙摆覆盖上方腿部，只展示下半身。',
+  'angle-18': 'Selected pose prompt / 选定姿势提示：第一视角俯拍镜头。模特一只脚从画面上方垂直伸入并穿鞋，脚尖朝画面下方；另一只展示鞋放在右下侧，形成脚上穿着一只、旁边展示一只的俯视构图。画面重点集中在脚部和展示鞋之间的关系。',
+  'angle-19': 'Selected pose prompt / 选定姿势提示：第一视角斜俯拍镜头。模特腿部从画面右侧进入，一只脚穿鞋伸向画面左上方，旁边左侧放置一只展示鞋。脚和展示鞋呈斜向并列关系，构图有明显俯视感，像低头看脚边鞋子的试穿展示。',
+  'angle-20': 'Selected pose prompt / 选定姿势提示：侧面中近景。模特穿裙站立，一只裸脚从右上方自然伸出，脚尖朝右下方；一双展示鞋放在画面左下方，鞋尖朝右。动作是裸脚靠近地面展示鞋，像准备穿鞋或试穿前的静态展示。',
+  'angle-21': 'Selected pose prompt / 选定姿势提示：侧面斜俯视构图。模特一只裸脚从左上方向左下方伸出，脚掌靠近地面；一双展示鞋放在画面右下方，鞋尖朝左。整体是裸脚与成对展示鞋并置的试穿前场景，裙摆位于画面上方。',
+  'angle-22': 'Selected pose prompt / 选定姿势提示：侧面平视或轻微俯视近景。模特一只脚穿鞋横向站立，鞋头朝右；另一只展示鞋平放在脚下方偏前景，鞋头同样朝右。画面是脚上穿着一只、下方展示一只的横向产品展示构图。',
+  'angle-23': 'Selected pose prompt / 选定姿势提示：斜俯拍近景。模特一只脚穿鞋从画面上方伸入，鞋头朝左下方；另一只展示鞋位于右下方前景，鞋头同样朝左下方。两只鞋形成上下错位的斜向排列，突出脚上试穿鞋与前景展示鞋的关系。',
+}
+
 const mergeAngleLibrary = [
   ...Array.from({ length: 15 }, (_, index) => index + 1).filter((angleNumber) => angleNumber !== 7),
   17,
@@ -3973,15 +3983,14 @@ function App() {
       }
       const footSideMatch = cleaned.layout.match(/footSide=([^,\n]+)/i) || cleaned.layout.match(/is worn on foot \(([^)]*side foot[^)]*)\)/i)
       const footSideText = String(footSideMatch?.[1] || '').toLowerCase()
-      const wornFootSide = /right-side/.test(footSideText)
+      const inferredWornFootSide = /right-side/.test(footSideText)
         ? 'RIGHT'
         : /left-side/.test(footSideText)
           ? 'LEFT'
-          : overheadSingleFootCamera
-            ? 'RIGHT'
-            : eyeLevelSingleFootCamera
-              ? 'LEFT'
-              : 'UNKNOWN'
+          : eyeLevelSingleFootCamera
+            ? 'LEFT'
+            : 'UNKNOWN'
+      const wornFootSide = overheadSingleFootCamera ? 'RIGHT' : inferredWornFootSide
       const displayShoeSide = wornFootSide === 'RIGHT' ? 'LEFT' : wornFootSide === 'LEFT' ? 'RIGHT' : 'OPPOSITE'
       const wornBuckleSide = wornFootSide === 'RIGHT' ? 'viewer-right' : wornFootSide === 'LEFT' ? 'viewer-left' : 'the detected worn-shoe side'
       const displayBuckleSide = displayShoeSide === 'RIGHT' ? 'viewer-right' : displayShoeSide === 'LEFT' ? 'viewer-left' : 'the opposite side'
@@ -3991,6 +4000,13 @@ function App() {
       const wornShoeAxis = axisForSingleFootObject(inferredSingleFootShoes?.worn)
       const displayShoeAxis = axisForSingleFootObject(inferredSingleFootShoes?.display)
       const sharedToeDirection = wornShoeAxis?.direction || displayShoeAxis?.direction || 'preserve-reference'
+      const displayPositionRelativeToWorn = displayShoeBox && wornShoeBox
+        ? displayShoeBox.centerX < wornShoeBox.centerX
+          ? 'viewer-left of S1 WORN x1'
+          : displayShoeBox.centerX > wornShoeBox.centerX
+            ? 'viewer-right of S1 WORN x1'
+            : 'at the same horizontal center as S1 WORN x1'
+        : 'at the detected S2 DISPLAY position relative to S1 WORN x1'
       const formatShoeBox = (box: ReturnType<typeof metrics> | null) => box
         ? `bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%, ${box.centerY}%)`
         : 'bbox inferred from the single-foot S x2 shoe mass'
@@ -4014,11 +4030,14 @@ function App() {
           ? `SINGLE-FOOT CAMERA SIDE LOCK BY CODE: cameraType=eye-level/side-view. The shoe worn on footX1 must be the ${wornFootSide} shoe with the buckle/clasp/strap fastener on ${wornBuckleSide}. The bare display shoe must be the ${displayShoeSide} shoe with the buckle/clasp/strap fastener on ${displayBuckleSide}. The worn shoe and display shoe must point their toes/fronts toward the same canvas direction; do not reverse one shoe toe direction to create the left/right pair. Keep this as one worn foot plus one bare display shoe, not two worn feet.`
           : `SINGLE-FOOT CAMERA SIDE LOCK BY CODE: cameraType=preserve-uploaded-angle. Keep exactly one shoe worn on footX1 and exactly one bare display shoe. Do not generate two worn feet; preserve the detected shoe coordinates and buckle/clasp side relationship from the uploaded single-foot angle reference. The worn shoe must be the ${wornFootSide} side and the display shoe must be the ${displayShoeSide} side. The worn shoe and display shoe must point their toes/fronts toward the same canvas direction as detected in the uploaded reference.`
       const singleFootToeDirectionLock = 'SINGLE-FOOT TOE DIRECTION SAME LOCK BY CODE: the shoe worn on footX1 and the bare display shoe must keep the same toe/front pointing direction on the canvas. Left/right shoe pairing is controlled by buckle/clasp side only; never flip one shoe so its toe points the opposite way.'
-      const singleFootSidePairAnalysisLock = `SINGLE-FOOT SIDE PAIR ANALYSIS BY CODE: wornFootSide=${wornFootSide}; displayShoeSide=${displayShoeSide}; wornShoeBuckleSide=${wornBuckleSide}; displayShoeBuckleSide=${displayBuckleSide}. If the worn shoe is ${wornFootSide}, the display shoe must be ${displayShoeSide}; do not generate the display shoe as the same ${wornFootSide} side. The two shoes must be an opposite left/right pair while their toe/front directions remain the same.`
+      const singleFootBuckleVerificationLock = `SINGLE-FOOT BUCKLE VISUAL VERIFICATION BY CODE: before generating, identify the uploaded product shoe buckle/clasp/strap fastener from the product reference. The ${wornFootSide} worn shoe must place that buckle/clasp on ${wornBuckleSide}; the ${displayShoeSide} bare display shoe must place that buckle/clasp on ${displayBuckleSide}. If the display shoe buckle appears on the same side as the worn shoe, on the inner side, or disappears, the result fails. Do not satisfy left/right pairing by rotating, mirroring, or reversing the toe direction; only the buckle/clasp side changes.`
+      const singleFootWholeShoeSideLock = `SINGLE-FOOT WHOLE-SHOE SIDE LOCK BY CODE: left/right pairing is not just strap direction. The entire shoe body must be the opposite side shoe: toe box curve, opening shape, inner wall, outer wall, heel counter, strap anchor, buckle/clasp side, and side seam must all match the ${wornFootSide}+${displayShoeSide} pair. Do not create two same-side shoes with only the buckle or strap moved to the other side.`
+      const singleFootSidePairAnalysisLock = `SINGLE-FOOT SIDE PAIR ANALYSIS BY CODE: wornFootSide=${wornFootSide}; displayShoeSide=${displayShoeSide}; wornShoeBuckleSide=${wornBuckleSide}; displayShoeBuckleSide=${displayBuckleSide}. If the worn shoe is ${wornFootSide}, the display shoe must be ${displayShoeSide}; do not generate the display shoe as the same ${wornFootSide} side. The two shoes must be an opposite left/right pair while their toe/front directions remain the same. Verify the pair by the whole shoe body and buckle/clasp side: the worn shoe buckle must be on ${wornBuckleSide}, and the display shoe buckle must be on ${displayBuckleSide}.`
       const singleFootIndependentShoeMap = [
         'SINGLE-FOOT INDEPENDENT SHOE MAP BY CODE:',
         `S1 WORN x1 = product shoe on footX1; ${formatShoeBox(wornShoeBox)}; ${formatAxis(wornShoeAxis)}; shoeSide=${wornFootSide}; buckleSide=${wornBuckleSide}.`,
         `S2 DISPLAY x1 = bare product display shoe only; ${formatShoeBox(displayShoeBox)}; ${formatAxis(displayShoeAxis, sharedToeDirection)}; shoeSide=${displayShoeSide}; buckleSide=${displayBuckleSide}.`,
+        `S2 DISPLAY x1 must remain ${displayPositionRelativeToWorn}; do not swap the S1 worn-shoe and S2 display-shoe locations.`,
         `S2 toeDirection must equal S1 toeDirection (${sharedToeDirection}). S2 must be the opposite left/right side from S1, but must not reverse toe/front direction.`,
         'SINGLE-FOOT PAIR GUIDE VISUAL RULE: the small pair-guide panel in the control image only explains left/right shoe pairing, same toe direction, and opposite buckle side. It must not control final shoe color, material, texture, lighting, background, or photographic style.',
       ].join('\n')
@@ -4034,6 +4053,8 @@ function App() {
         `SINGLE-FOOT CAMERA DESCRIPTION BY CODE: ${cameraLock}`,
         singleFootCameraSideLock,
         singleFootToeDirectionLock,
+        singleFootBuckleVerificationLock,
+        singleFootWholeShoeSideLock,
         singleFootSidePairAnalysisLock,
         singleFootIndependentShoeMap,
       ].filter(Boolean)
@@ -4722,6 +4743,7 @@ function App() {
             ? uploadedAnglePrompt
             : `Selected angle-library template: ${angleItem.label} (${angleItem.id}.png). This merge-angle image is the only pose/composition/semantic-mask template for this generation.`,
           angleItem.uploadedFile ? '' : mergeAnglePosePrompts[angleItem.id],
+          angleItem.uploadedFile ? '' : mergeAngleAddedPosePrompts[angleItem.id],
           modelFile ? 'A model reference image is uploaded. Use it only for outfit category/color/fabric, body-limb appearance, skin tone, lower-body proportion, and elegant styling as secondary support for the product shoes. Do not copy model shoes, model background, wall, floor, props, basket, flowers, watermark, or lighting pattern.' : 'No model reference image is uploaded. Generate simple natural body limbs/clothing only as required by the angle reference.',
           'Lower-body-only framing: never generate the model face, head, portrait, or full upper body. Keep the crop focused on shoes, feet, legs, hands if present in the angle mask, and only the clothing portion required around the lower body.',
           isHandAngleUpload
