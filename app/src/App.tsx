@@ -2,6 +2,7 @@
 import './App.css'
 import { PreviewGallery } from './components/PreviewGallery'
 import { ProjectsPanel } from './components/ProjectsPanel'
+import { mergeAngleAddedPosePrompts, mergeAngleLibrary, mergeAnglePosePrompts } from './merge-angle-library'
 
 type Skill = {
   id: string
@@ -400,6 +401,7 @@ type ProjectImage = {
   prompt?: string
   compactPrompt?: string
   debugFinalPrompt?: string
+  hasPrompt?: boolean
   imageModel?: string
   size?: string
   createdAt?: string
@@ -411,6 +413,7 @@ type ProjectItem = {
   brief: string
   createdAt?: string
   updatedAt?: string
+  uploadedFiles?: UploadedFile[]
   images: ProjectImage[]
 }
 
@@ -460,54 +463,11 @@ const mergeImageSlots: MergeImageSlot[] = [
   { id: 'background', label: '背景图', hint: '锁定墙面、地面、空间、光线和阴影方向' },
   { id: 'angle', label: '角度参考图', hint: '黄=鞋子角度，蓝=腿，红=衣服，黑=背景区域' },
   { id: 'angleHand', label: '角度参考图（含手）', hint: '用于手持、手扶、手拿鞋等含手部动作的角度参考' },
-  { id: 'angleSingle', label: '角度参考图（单脚）', hint: '用于只有一只脚穿鞋，另一只鞋为展示或不出现的角度参考' },
   { id: 'model', label: '模特参考图', hint: '可选：按蓝/红区域参考腿部和穿搭' },
 ]
 
-const mergeAnglePosePrompts: Record<string, string> = {
-  'angle-01': 'Selected pose prompt: walking-left product-shoe pose. The person is moving toward the left side of the frame. The front foot points left and leads the step; the rear foot follows behind with the heel slightly lifted from the ground, creating a natural walking motion. Preserve the leftward walking direction, shoe toe pointing left, raised rear heel, side-view shoe angle, and low product-focused camera framing.',
-  'angle-02': 'Selected pose prompt: seated-feeling lower-right-to-center crossed stacked-feet product-shoe focus pose. The model should read as seated or supported outside the frame, never sitting on the floor. The legs extend from the lower-right corner of the frame toward the center, guiding attention to the feet wearing the product shoes. The feet are crossed and stacked, with one foot clearly resting or layered on top of the other foot rather than simply standing side by side. The camera focus should be on the shoes worn on the feet, with the product shoes as the clearest main subject. Preserve the seated-feeling lower-body posture, lower-right entry direction, diagonal leg extension toward the center, overlapping crossed-foot relationship, one-foot-on-top-of-the-other structure, product-shoe focal point, close lower-body crop, and selected angle image perspective.',
-  'angle-03': 'Selected pose prompt: hands-only product shoe display. Do not show the person body, torso, legs, face, or head. Only the person hands extend into the frame to hold and present the product shoe toward the camera as the main subject. The shoe is supported by the hands, with fingers naturally wrapping or cupping around it without covering key shoe details. For the red region in this angle mask: it does not always need to become clothing. If a model reference image is uploaded and the model is wearing sleeveless clothing or no visible sleeve in the corresponding area, do not force sleeves or extra clothing into the red region; follow the uploaded model reference clothing only where it naturally applies. If no model reference image is uploaded, follow the angle-03 region layout itself completely for the red region and composition. Preserve the hands-entering-the-frame display feeling, hand-held product presentation, close product focus, and clean presentation angle.',
-  'angle-04': 'Selected pose prompt: left-facing raised-foot heel-adjusting pose. The person faces or moves toward the left side of the frame. One foot is lifted backward or upward, and one hand reaches toward the lifted foot to adjust or tidy the shoe heel. Preserve the left-facing body direction, raised foot, hand reaching to the shoe heel, side-view low-camera perspective, and natural try-on adjustment action.',
-  'angle-05': 'Selected pose prompt: seated cross-leg shoe-try-on pose. The model should read as a seated cross-leg try-on posture, as if supported outside the frame, never sitting on the floor, with one leg crossed over the other or one lower leg resting across the opposite leg. Do not add a visible stool, bench, chair, platform, or support object unless it is clearly required by the selected angle image. Follow the selected angle image for camera angle and crop: if the angle image only shows skirt hem, legs, and shoes, do not force a full upper body unless the output is horizontal and needs extra framing. One product shoe is the main display foot and the other leg only supports the crossed-leg posture. Preserve the seated posture feeling, ankle overlap, bent-knee relationship, shoe angle, and low side/front product-camera view from the angle image.',
-  'angle-06': 'Selected pose prompt: seated shoe-holding product display pose. The model should read as seated, as if supported outside the frame, never sitting on the floor. One foot wears the product shoe while a hand holds another product shoe for display, creating a seated try-on and handheld-shoe presentation. Do not add a visible stool, bench, chair, platform, or support object unless clearly required by the selected angle image. Preserve the seated posture feeling, worn-shoe and handheld-shoe contrast, hand-held shoe position, and product-focused framing.',
-  'angle-08': 'Selected pose prompt: seated cross-leg shoe-try-on pose. The model should read as seated on the left side of the frame and facing or turning toward the right, as if supported outside the frame, never sitting on the floor. The legs are crossed, with one lower leg laid over or in front of the other. Do not add a visible stool, bench, chair, platform, or support object unless it is clearly required by the selected angle image. Follow the selected angle image for camera angle and crop: if the angle image only shows skirt hem, legs, and shoes, do not force a full upper body unless the output is horizontal and needs extra framing. The product shoe on the raised or forward foot is the main focus, and the shoe exterior must be generated from the uploaded product shoe image, not from the angle-library image. Preserve the left-side seated position, right-facing body direction, crossed ankles, bent leg silhouette, shoe direction, side/front camera angle, and try-on posture visible in the angle image.',
-  'angle-09': 'Selected pose prompt: seated shoe display pose with one worn shoe and one handheld shoe. The model should read as seated on the left side of the frame and facing or turning toward the right, as if supported outside the frame, never sitting on the floor. One foot is planted or extended while wearing the product shoe, and one hand holds a second product shoe for display. Do not add a visible stool, bench, chair, platform, or support object unless clearly required by the selected angle image. Preserve the left-side seated position, right-facing body direction, seated try-on feeling, handheld shoe display, worn-shoe contrast, and frontal-side product camera view.',
-  'angle-10': 'Selected pose prompt: first-person lower-body shoe display pose. One foot extends into the frame from the bottom edge, as if viewed from the model own first-person perspective. Beside the foot, one hand holds a product shoe for display. Preserve the bottom-entry foot direction, first-person try-on feeling, hand-held shoe beside the foot, close lower-body framing, product-focused composition, and the selected angle image camera angle, crop, spacing, and perspective.',
-  'angle-11': 'Selected pose prompt: centered side-view one-leg-back pose. The support foot is planted near the lower-left. The other leg bends backward toward the right-middle, with the raised shoe pointing slightly down. Preserve the single support foot, backward lifted shoe, bent-knee silhouette, and low side-view framing.',
-  'angle-12': 'Selected pose prompt: right-side seated-feeling two-feet shoe display with foreground pick-up action. The model is positioned on the right side of the frame and faces or turns toward the left. The posture should read as seated or supported outside the frame, never sitting on the floor; the support object does not need to appear. Both feet are displayed in the upper area of the composition, following the selected angle image for foot placement, shoe direction, camera angle, and crop. Use a close high-angle oblique top-down camera view, like the camera is above and in front of the model feet at about a 45-degree downward angle. The view is not a flat overhead view and not an eye-level view; it must be a perspective-rich diagonal top-down product angle. One hand reaches toward or prepares to pick up the foreground display shoes. The foreground display shoes are a pair, not a single shoe, and they are only ground/display shoes with no extra legs. Preserve the right-to-left body direction, seated-feeling posture, two upper-frame feet, hand-reaching action, paired foreground display-shoe relationship, close oblique top-down perspective, and product-focused camera view from the angle image.',
-  'angle-13': 'Selected pose prompt: right-edge entry with lower worn shoe and upper handheld shoe. The lower area shows one foot wearing the product shoe for display; this lower worn shoe should tilt upward at the front/toe area, with the shoe front clearly raised and only the heel touching the ground. The upper area shows one hand holding another product shoe horizontally for display, and the handheld display shoe must stay very close to the worn shoe on the foot rather than being far away from it. The two visible shoes must form a left-right pair, not two shoes from the same side: if the worn shoe is the left-foot shoe, the handheld shoe must be the matching right-foot shoe; if the worn shoe is the right-foot shoe, the handheld shoe must be the matching left-foot shoe. For both the worn shoe on the foot and the handheld display shoe, the shoe toe/front must point toward the left side of the frame. The handheld shoe must be held sideways and horizontally across the frame; its front/top face should face the camera for product display, while its toe still points left. Do not show the handheld shoe sole or back as the main facing surface. Both the foot and the hand enter from the right side of the frame. Preserve the right-side entry direction, lower-foot shoe display, matching left-right shoe pair, both shoe toes pointing left, upward front/toe shoe presentation with heel contact only, tight spacing between the handheld display shoe and the worn shoe, upper-handheld shoe held-horizontal presentation, front-facing horizontal shoe view, high/side product-view relationship, and layered composition.',
-  'angle-14': 'Selected pose prompt: left-side seated shoe display with oblique high-angle foot view. The model should be seated on the left side of the frame, as if supported outside the frame, never sitting on the floor. The product shoe toe/front should point toward the right side of the frame. Use a medium-high oblique top-down camera view: the camera is above and slightly in front of the model feet, shooting downward at about a 35-45 degree angle. The view is not a frontal eye-level view and not a flat overhead view; it must feel like a realistic perspective-rich oblique top-down foot/shoe product shot. Do not force a full upper body if the selected angle image only shows lower body, legs, shoes, and foreground display shoes. Any shoes in the foreground are only ground/display shoes and must not receive extra legs. Preserve the left-side seated position, shoe toe pointing right, real perspective from the 35-45 degree high oblique camera angle, foreground depth, product-shoe focus, and selected angle image crop.',
-  'angle-15': 'Selected pose prompt: seated cross-leg shoe-try-on pose with scattered foreground shoes. The model should read as a seated cross-leg try-on posture, as if supported outside the frame, never sitting on the floor, with one leg crossed over the other, creating a bent-knee try-on posture. Do not add a visible stool, bench, chair, platform, or support object unless it is clearly required by the selected angle image. Follow the selected angle image for camera angle and crop: if the angle image only shows skirt hem, legs, shoes, and scattered foreground shoes, do not force a full upper body unless the output is horizontal and needs extra framing. The worn product shoe on the main crossed or forward foot is the key display shoe; any scattered foreground shoes are only ground/display shoes and must not create additional legs. Preserve the seated posture feeling, leg crossing, ankle relationship, shoe angle, low side/front camera view, and spatial relationship shown in the angle image.',
-}
-
-const mergeAngleAddedPosePrompts: Record<string, string> = {
-  'angle-17': 'Selected pose prompt / 选定姿势提示：侧面低机位产品鞋近景，只展示模特下半身和鞋子。画面中只有一只脚穿鞋，另一只脚不出现。穿鞋的脚从画面上方自然伸入，脚尖朝画面左侧，鞋跟在画面右侧，脚踝和小腿自然向上延伸。脚上穿着的鞋和脚的朝向必须参考当前角度图中这一边：生成的脚应该是内踝那一侧，不要生成外侧脚踝那一侧；脚上鞋显示的是无环扣的侧面，脚上穿的这只鞋正面可见侧不能出现环扣/搭扣。脚上穿鞋的脚也必须是参考图中这一边的脚，不能换成另一边的脚，不能把脚上鞋生成成有环扣/搭扣的可见侧；脚上鞋从当前镜头角度看应该看不到环扣。另一只鞋是无人穿着的前景展示鞋，放在穿鞋脚的下方偏前景位置，鞋内不能出现脚、脚趾、脚踝、腿或皮肤。两只鞋的鞋头方向一致，都朝画面左侧；鞋跟都在画面右侧；两只鞋保持平行或轻微错位的产品展示关系。镜头聚焦鞋子，不要生成脸、头部或完整上半身。只有上方那只鞋是穿在脚上的；下方前景鞋必须是空鞋展示，不属于任何脚，不要把前景展示鞋变成第二只穿着鞋。先以脚上穿着的脚为基准判断鞋子左右：脚上穿着的鞋必须正确贴合这只脚的真实解剖方向，不能让脚穿进错误左右边的鞋。前景展示鞋必须是脚上穿着鞋的另一只配对鞋，是相反脚的鞋。两只鞋是一双真实左右配对鞋，不是两只同边鞋，也不是复制同一只鞋两次。两只鞋鞋头方向一致，都朝画面左侧，鞋跟都在画面右侧；但鞋面结构、鞋扣/环扣、搭扣、绑带固定点必须呈左右镜像关系。鞋扣/环扣只允许出现在每只鞋自己的外侧，不能出现在两只鞋相互靠近的中间侧；脚上穿着的鞋在当前可见侧不能出现环扣，前景展示鞋可以在自己的外侧显示环扣。不要让两个环扣都在画面同一侧，也不要让两个环扣朝同一个方向。判断顺序：第一，保证脚上穿着的鞋符合脚的真实解剖方向，并且生成脚的可见侧是内踝那一侧，不要生成外侧脚踝那一侧，脚上鞋这一侧可见面无环扣/无搭扣；第二，展示鞋必须是另一只相反配对鞋；第三，鞋扣只允许在每只鞋外侧；第四，鞋头方向保持一致。',
-  'angle-18': 'Selected pose prompt / 选定姿势提示：第一视角俯拍镜头。模特一只脚从画面上方垂直伸入并穿鞋，脚尖朝画面下方；另一只展示鞋放在右下侧，形成脚上穿着一只、旁边展示一只的俯视构图。裙摆向画面的右边拉动，也就是向右下侧展示鞋那边自然偏移，模拟另一只脚在画面外把裙摆牵引过去的感觉；另一只脚本身不要出现。脚上穿的鞋子必须参考当前角度16参考图里脚上这只鞋的左右关系和扣件方向：生成的脚必须是右脚，不是左脚；右脚外踝面向画面左边，右脚内踝面向画面右边，也就是面向右下侧展示鞋的那一边。脚上穿着的鞋必须正确贴合右脚，鞋扣/环扣/搭扣必须在右脚外踝那一边，也就是画面左边；脚上鞋面向展示鞋的那一面，也就是内踝侧/画面右侧，不能出现环扣/搭扣。脚上鞋和右下侧展示鞋必须是一双真实左右配对鞋，不要生成两只一样的鞋子，不要把同一只鞋复制两次，不要把脚上鞋和展示鞋都生成成同边鞋。判断顺序：第一，先确认脚是右脚；第二，确认脚上鞋的鞋扣在外踝侧/画面左边；第三，确认脚上鞋面向展示鞋的内踝侧/画面右边没有环扣/搭扣；第四，确认展示鞋是另一只相反配对鞋。画面重点集中在脚部和展示鞋之间的关系。',
-  'angle-19': 'Selected pose prompt / 选定姿势提示：第一视角斜俯拍镜头。模特腿部从画面右侧进入，一只脚穿鞋伸向画面左上方，旁边左侧放置一只展示鞋。脚和展示鞋呈斜向并列关系，构图有明显俯视感，像低头看脚边鞋子的试穿展示。展示鞋应该和脚上穿着的鞋鞋头是同一个方向：两只鞋的鞋头都必须朝画面的左上角，鞋跟都相对朝画面的右下角。不要让展示鞋鞋头朝向和脚上鞋相反，也不要把展示鞋旋转成其他方向。',
-  'angle-20': 'Selected pose prompt / 选定姿势提示：侧面中近景。人物是坐着的姿态，像坐在画面外的椅子或支撑物上，但不要生成完整椅子或上半身。人物的脚从画面左上角自然伸出，人物的朝向和展示鞋的鞋头朝向一致，都朝画面的右边；不要生成朝向相反的坐姿。画面中是两只裸脚，不是单只裸脚；人物踮起脚尖，脚跟自然抬起，脚尖靠近地面，形成准备试穿的轻盈姿态。两只裸脚靠近墙边，视觉上位于展示鞋的后面，形成后方裸脚、前方展示鞋的空间层级。一双展示鞋放在画面左下方，鞋尖朝右。角度18中，展示鞋的鞋头方向以本专属提示词为准：展示鞋鞋头必须朝画面右边，鞋跟在画面左边；即使产品鞋参考图原始朝向不同，也要把产品鞋旋转到这个方向。不要让展示鞋朝左、朝下、朝上或反向。这条只覆盖鞋头方向和摆放方向，不覆盖鞋子外观，鞋子外观仍然100%来自产品鞋图。动作是坐姿下两只裸脚踮起脚尖靠近地面展示鞋，像准备穿鞋或试穿前的静态展示。',
-  'angle-21': 'Selected pose prompt / 选定姿势提示：侧面斜俯视构图。模特一只裸脚从左上方向左下方伸出，脚掌靠近地面；一双展示鞋放在画面右下方，鞋尖朝左。整体是裸脚与成对展示鞋并置的试穿前场景，裙摆位于画面上方。',
-  'angle-22': 'Selected pose prompt / 选定姿势提示：侧面平视或轻微俯视近景。模特一只脚穿鞋横向站立，鞋头朝右；另一只展示鞋平放在脚下方偏前景，鞋头同样朝右。画面是脚上穿着一只、下方展示一只的横向产品展示构图。靠向墙面的脚是穿着鞋的脚，这只脚必须生成内脚踝那一边，也就是内踝侧，不要生成外脚踝/外踝那一边；脚上穿着的鞋从当前镜头看不到环扣/搭扣，脚上鞋的可见侧必须像参考图一样是无环扣侧。展示鞋可以在自己的外侧显示环扣/搭扣，但脚上鞋面向镜头的这一侧不能出现环扣/搭扣。',
-  'angle-23': 'Selected pose prompt / 选定姿势提示：斜俯拍近景。模特一只脚穿鞋从画面上方伸入，鞋头朝左下方；另一只展示鞋位于右下方前景，鞋头同样朝左下方。两只鞋形成上下错位的斜向排列，突出脚上试穿鞋与前景展示鞋的关系。靠向墙面的脚是穿着鞋的脚，这只脚必须生成内脚踝那一边，也就是内踝侧，不要生成外脚踝/外踝那一边；脚上穿着的鞋从当前镜头看不到环扣/搭扣，脚上鞋的可见侧必须像参考图一样是无环扣侧。展示鞋可以在自己的外侧显示环扣/搭扣，但脚上鞋面向镜头的这一侧不能出现环扣/搭扣。',
-}
-
-const mergeAngleLibrary = [
-  ...Array.from({ length: 15 }, (_, index) => index + 1).filter((angleNumber) => angleNumber !== 7),
-  17,
-  18,
-  19,
-  20,
-  21,
-  22,
-  23,
-]
-  .map((angleNumber, displayIndex) => ({
-    id: `angle-${String(angleNumber).padStart(2, '0')}`,
-    label: `角度 ${displayIndex + 1}`,
-    url: `/assets/merge-angle-library/angle-${String(angleNumber).padStart(2, '0')}.png`,
-  }))
 const mergeAngleBatchLimit = 10
-const mergeAngleUploadSlotIds = ['angle', 'angleHand', 'angleSingle'] as const
+const mergeAngleUploadSlotIds = ['angle', 'angleHand'] as const
 type MergeAngleUploadSlotId = (typeof mergeAngleUploadSlotIds)[number]
 const isMergeAngleUploadSlot = (slotId: string): slotId is MergeAngleUploadSlotId =>
   mergeAngleUploadSlotIds.includes(slotId as MergeAngleUploadSlotId)
@@ -863,6 +823,9 @@ function App() {
   const [createSkillOpen, setCreateSkillOpen] = useState(false)
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
+  const [projectsLoadingMore, setProjectsLoadingMore] = useState(false)
+  const [projectsHasMore, setProjectsHasMore] = useState(false)
+  const [projectsNextOffset, setProjectsNextOffset] = useState(0)
   const [skillCreateForm, setSkillCreateForm] = useState<SkillCreateForm>(emptySkillCreateForm)
   const [skillCreateOutline, setSkillCreateOutline] = useState('')
   const [skillCreateProviderError, setSkillCreateProviderError] = useState('')
@@ -1212,14 +1175,39 @@ function App() {
     setProjectsLoading(true)
     setError('')
     try {
-      const response = await fetch('/api/projects')
-      const data = await readJsonResponse(response)
+      const response = await fetch('/api/projects?limit=50&offset=0')
+      const data = await readJsonResponse(response) as { projects?: ProjectItem[]; hasMore?: boolean; nextOffset?: number; error?: string }
       if (!response.ok) throw new Error(data.error || '无法读取项目列表。')
-      setProjects(Array.isArray(data.projects) ? data.projects as ProjectItem[] : [])
+      setProjects(Array.isArray(data.projects) ? data.projects : [])
+      setProjectsHasMore(Boolean(data.hasMore))
+      setProjectsNextOffset(Number(data.nextOffset || 0))
     } catch (projectsError) {
       setError(projectsError instanceof Error ? projectsError.message : '无法读取项目列表。')
     } finally {
       setProjectsLoading(false)
+    }
+  }
+
+  async function loadMoreProjects() {
+    if (projectsLoadingMore || !projectsHasMore) return
+    setProjectsLoadingMore(true)
+    setError('')
+    try {
+      const response = await fetch(`/api/projects?limit=50&offset=${projectsNextOffset}`)
+      const data = await readJsonResponse(response) as { projects?: ProjectItem[]; hasMore?: boolean; nextOffset?: number; error?: string }
+      if (!response.ok) throw new Error(data.error || '无法读取更多生成记录。')
+      const nextProjects = Array.isArray(data.projects) ? data.projects : []
+      setProjects((current) => {
+        const byId = new Map(current.map((project) => [project.id, project]))
+        nextProjects.forEach((project) => byId.set(project.id, project))
+        return Array.from(byId.values())
+      })
+      setProjectsHasMore(Boolean(data.hasMore))
+      setProjectsNextOffset(Number(data.nextOffset || projectsNextOffset + nextProjects.length))
+    } catch (projectsError) {
+      setError(projectsError instanceof Error ? projectsError.message : '无法读取更多生成记录。')
+    } finally {
+      setProjectsLoadingMore(false)
     }
   }
 
@@ -1242,6 +1230,15 @@ function App() {
       setError(deleteError instanceof Error ? deleteError.message : '删除项目失败。')
       throw deleteError
     }
+  }
+
+  async function loadProjectImagePrompt(projectId: string, imageUrl: string) {
+    const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}`)
+    const data = await readJsonResponse(response) as { project?: ProjectItem; error?: string }
+    if (!response.ok || !data.project) throw new Error(data.error || '无法读取提示词。')
+    setProjects((current) => current.map((project) => (project.id === projectId ? data.project as ProjectItem : project)))
+    const image = (data.project.images || []).find((item) => item.imageUrl === imageUrl)
+    return image?.prompt || image?.compactPrompt || image?.debugFinalPrompt || ''
   }
 
   async function deleteSkill(skillToDelete: SkillDeleteConfirm) {
@@ -1942,6 +1939,65 @@ function App() {
     return new File([blob], fileName, { type: blob.type || 'image/png' })
   }
 
+  function getReusableMergeSlot(file: UploadedFile): MergeImageSlot['id'] | '' {
+    const name = `${file.fileName || ''} ${file.originalName || ''}`.toLowerCase()
+    if (
+      name.includes('merge-angle-control-') ||
+      name.includes('merge-angle-hand-shoe-prelayout-') ||
+      name.includes('merge-angle-foot-side-reference-') ||
+      name.includes('merge-angle-leg-action-reference-')
+    ) {
+      return ''
+    }
+    if (name.includes('merge-product-')) return 'product'
+    if (name.includes('merge-background-')) return 'background'
+    if (name.includes('merge-model-')) return 'model'
+    if (name.includes('merge-angle-hand-')) return 'angleHand'
+    if (name.includes('merge-angle-')) return 'angle'
+    return ''
+  }
+
+  async function fileFromProjectUpload(file: UploadedFile) {
+    const response = await fetch(file.url)
+    if (!response.ok) throw new Error(`读取参考图失败：${file.originalName || file.fileName}`)
+    const blob = await response.blob()
+    const name = file.originalName || file.fileName || 'reused-reference.png'
+    return new File([blob], name, { type: blob.type || file.mimeType || 'image/png' })
+  }
+
+  async function reuseProjectMergeReferences(project: ProjectItem) {
+    const reusableFiles = (project.uploadedFiles || [])
+      .map((file) => ({ file, slotId: getReusableMergeSlot(file) }))
+      .filter((item): item is { file: UploadedFile; slotId: MergeImageSlot['id'] } => Boolean(item.slotId))
+
+    if (!reusableFiles.length) {
+      setError('这条生成记录没有可复用的原始参考图。')
+      return
+    }
+
+    setError('')
+    setOperationStatus('正在复用生成记录里的参考图...')
+    try {
+      const nextFiles: Record<string, File[]> = {}
+      for (const item of reusableFiles) {
+        const restoredFile = await fileFromProjectUpload(item.file)
+        nextFiles[item.slotId] = isMergeAngleUploadSlot(item.slotId)
+          ? [...(nextFiles[item.slotId] || []), restoredFile].slice(0, mergeAngleBatchLimit)
+          : [restoredFile]
+      }
+      setMergeImageFiles((current) => ({ ...current, ...nextFiles }))
+      if (Object.keys(nextFiles).some(isMergeAngleUploadSlot)) setSelectedMergeAngleIds([])
+      const filledLabels = Object.keys(nextFiles)
+        .map((slotId) => mergeImageSlots.find((slot) => slot.id === slotId)?.label || slotId)
+        .join('、')
+      setOperationStatus(`已复用参考图：${filledLabels}`)
+    } catch (reuseError) {
+      const message = reuseError instanceof Error ? reuseError.message : '参考图复用失败。'
+      setError(message)
+      setOperationStatus('')
+    }
+  }
+
   async function describeAngleColorBlocks(file: File, sourceLabel = '?????') {
     try {
       const bitmap = await createImageBitmap(file)
@@ -2525,11 +2581,14 @@ function App() {
         const vy = Math.sin(angle)
         let minProjection = Number.POSITIVE_INFINITY
         let maxProjection = Number.NEGATIVE_INFINITY
+        const projections: Array<{ x: number; y: number; projection: number; perpendicular: number }> = []
         for (let y = component.minY; y <= component.maxY; y += 1) {
           for (let x = component.minX; x <= component.maxX; x += 1) {
             const index = y * width + x
             if (!mask[index]) continue
             const projection = (x - meanX) * vx + (y - meanY) * vy
+            const perpendicular = (x - meanX) * -vy + (y - meanY) * vx
+            projections.push({ x, y, projection, perpendicular })
             minProjection = Math.min(minProjection, projection)
             maxProjection = Math.max(maxProjection, projection)
           }
@@ -4309,6 +4368,11 @@ function App() {
         if (vertical && horizontal) return `${vertical}-${horizontal}`
         return vertical || horizontal || 'center'
       }
+      const handPlacementName = (centerX: number, centerY: number) => {
+        const horizontal = centerX < 34 ? 'left' : centerX > 66 ? 'right' : 'center'
+        const vertical = centerY < 34 ? 'upper' : centerY > 66 ? 'lower' : 'middle'
+        return vertical === 'middle' ? `${horizontal}-middle` : `${vertical}-${horizontal}`
+      }
       const axisForComponent = (mask: Uint8Array, component: HandAngleComponent) => {
         let count = 0
         let sumX = 0
@@ -4344,24 +4408,273 @@ function App() {
         const vy = Math.sin(angle)
         let minProjection = Number.POSITIVE_INFINITY
         let maxProjection = Number.NEGATIVE_INFINITY
+        const projections: Array<{ x: number; y: number; projection: number; perpendicular: number }> = []
         for (let y = component.minY; y <= component.maxY; y += 1) {
           for (let x = component.minX; x <= component.maxX; x += 1) {
             const index = y * width + x
             if (!mask[index]) continue
             const projection = (x - meanX) * vx + (y - meanY) * vy
+            const perpendicular = (x - meanX) * -vy + (y - meanY) * vx
+            projections.push({ x, y, projection, perpendicular })
             minProjection = Math.min(minProjection, projection)
             maxProjection = Math.max(maxProjection, projection)
           }
         }
-        const start = {
+        const pcaStart = {
           x: Math.round(((meanX + vx * minProjection) / width) * 100),
           y: Math.round(((meanY + vy * minProjection) / height) * 100),
         }
-        const end = {
+        const pcaEnd = {
           x: Math.round(((meanX + vx * maxProjection) / width) * 100),
           y: Math.round(((meanY + vy * maxProjection) / height) * 100),
         }
-        return { start, end, direction: handDirectionFromDelta(end.x - start.x, end.y - start.y) }
+        let longestStart = pcaStart
+        let longestEnd = pcaEnd
+        let longestDistance = Math.hypot(pcaEnd.x - pcaStart.x, pcaEnd.y - pcaStart.y)
+        const sampleStep = Math.max(1, Math.floor(projections.length / 1800))
+        const sampledPixels = projections.filter((_, index) => index % sampleStep === 0)
+        for (let degree = 0; degree < 180; degree += 10) {
+          const radians = (degree / 180) * Math.PI
+          const dirX = Math.cos(radians)
+          const dirY = Math.sin(radians)
+          let minItem = sampledPixels[0]
+          let maxItem = sampledPixels[0]
+          let minValue = Number.POSITIVE_INFINITY
+          let maxValue = Number.NEGATIVE_INFINITY
+          for (const item of sampledPixels) {
+            const value = item.x * dirX + item.y * dirY
+            if (value < minValue) {
+              minValue = value
+              minItem = item
+            }
+            if (value > maxValue) {
+              maxValue = value
+              maxItem = item
+            }
+          }
+          if (!minItem || !maxItem) continue
+          const candidateStart = {
+            x: Math.round((minItem.x / width) * 100),
+            y: Math.round((minItem.y / height) * 100),
+          }
+          const candidateEnd = {
+            x: Math.round((maxItem.x / width) * 100),
+            y: Math.round((maxItem.y / height) * 100),
+          }
+          const distance = Math.hypot(candidateEnd.x - candidateStart.x, candidateEnd.y - candidateStart.y)
+          if (distance > longestDistance) {
+            longestDistance = distance
+            longestStart = candidateStart
+            longestEnd = candidateEnd
+          }
+        }
+        const start = longestStart
+        const end = longestEnd
+        const range = Math.max(1, maxProjection - minProjection)
+        const capSize = Math.max(1, range * 0.22)
+        const capStats = (nearStart: boolean) => {
+          const cap = projections.filter((item) =>
+            nearStart ? item.projection <= minProjection + capSize : item.projection >= maxProjection - capSize,
+          )
+          const count = cap.length
+          const spread = count
+            ? cap.reduce((sum, item) => sum + Math.abs(item.perpendicular), 0) / count
+            : 0
+          return { count, spread, score: count + spread * 0.35 }
+        }
+        const startStats = capStats(true)
+        const endStats = capStats(false)
+        const toe = endStats.score >= startStats.score ? end : start
+        const heel = endStats.score >= startStats.score ? start : end
+        return {
+          start,
+          end,
+          direction: handDirectionFromDelta(end.x - start.x, end.y - start.y),
+          toe,
+          heel,
+          toeDirection: handDirectionFromDelta(toe.x - heel.x, toe.y - heel.y),
+        }
+      }
+      const detectHighHeelToeHeel = (mask: Uint8Array, component: HandAngleComponent) => {
+        const boxWidth = component.maxX - component.minX + 1
+        const boxHeight = component.maxY - component.minY + 1
+        const boxDiagonal = Math.hypot(boxWidth, boxHeight)
+        if (component.count < 120 || boxDiagonal < 48) return null
+
+        const pixels: Array<{ x: number; y: number }> = []
+        let sumX = 0
+        let sumY = 0
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            if (!mask[y * width + x]) continue
+            pixels.push({ x, y })
+            sumX += x
+            sumY += y
+          }
+        }
+        if (pixels.length < 120) return null
+
+        const centerX = sumX / pixels.length
+        const centerY = sumY / pixels.length
+        const maxDistanceFromCenter = pixels.reduce(
+          (maxDistance, pixel) => Math.max(maxDistance, Math.hypot(pixel.x - centerX, pixel.y - centerY)),
+          1,
+        )
+        const radius = Math.max(4, Math.round(Math.min(boxWidth, boxHeight) * 0.045))
+        const localFill = (px: number, py: number) => {
+          let filled = 0
+          let total = 0
+          const minX = Math.max(component.minX, Math.round(px) - radius)
+          const maxX = Math.min(component.maxX, Math.round(px) + radius)
+          const minY = Math.max(component.minY, Math.round(py) - radius)
+          const maxY = Math.min(component.maxY, Math.round(py) + radius)
+          for (let y = minY; y <= maxY; y += 1) {
+            for (let x = minX; x <= maxX; x += 1) {
+              total += 1
+              if (mask[y * width + x]) filled += 1
+            }
+          }
+          return total ? filled / total : 0
+        }
+
+        const localFillCache = new Map<number, number>()
+        const cachedLocalFill = (px: number, py: number) => {
+          const key = Math.round(py) * width + Math.round(px)
+          const cached = localFillCache.get(key)
+          if (cached != null) return cached
+          const fill = localFill(px, py)
+          localFillCache.set(key, fill)
+          return fill
+        }
+        const densePixels = pixels.filter((pixel) => cachedLocalFill(pixel.x, pixel.y) >= 0.29)
+        if (densePixels.length < pixels.length * 0.38 || densePixels.length < 80) return null
+
+        const pcaForPixels = (items: Array<{ x: number; y: number }>) => {
+          const meanX = items.reduce((sum, item) => sum + item.x, 0) / items.length
+          const meanY = items.reduce((sum, item) => sum + item.y, 0) / items.length
+          let covXX = 0
+          let covXY = 0
+          let covYY = 0
+          for (const item of items) {
+            const dx = item.x - meanX
+            const dy = item.y - meanY
+            covXX += dx * dx
+            covXY += dx * dy
+            covYY += dy * dy
+          }
+          const angle = 0.5 * Math.atan2(2 * covXY, covXX - covYY)
+          const vx = Math.cos(angle)
+          const vy = Math.sin(angle)
+          let minProjection = Number.POSITIVE_INFINITY
+          let maxProjection = Number.NEGATIVE_INFINITY
+          for (const item of items) {
+            const projection = (item.x - meanX) * vx + (item.y - meanY) * vy
+            minProjection = Math.min(minProjection, projection)
+            maxProjection = Math.max(maxProjection, projection)
+          }
+          return { meanX, meanY, vx, vy, minProjection, maxProjection }
+        }
+        const bodyAxis = pcaForPixels(densePixels)
+        const bodyAxisLength = Math.max(1, bodyAxis.maxProjection - bodyAxis.minProjection)
+        const distanceFromMainShoeAxis = (px: number, py: number) =>
+          Math.abs((px - bodyAxis.meanX) * -bodyAxis.vy + (py - bodyAxis.meanY) * bodyAxis.vx)
+        const sideHeelDistanceThreshold = Math.max(7, Math.min(boxWidth, boxHeight) * 0.14)
+
+        const sampleStep = Math.max(1, Math.floor(pixels.length / 2600))
+        let bestHeel: { x: number; y: number; score: number; stemFill: number } | null = null
+        for (let index = 0; index < pixels.length; index += sampleStep) {
+          const pixel = pixels[index]
+          const distanceFromCenter = Math.hypot(pixel.x - centerX, pixel.y - centerY)
+          if (distanceFromCenter < maxDistanceFromCenter * 0.42) continue
+          const offAxisDistance = distanceFromMainShoeAxis(pixel.x, pixel.y)
+          if (offAxisDistance < sideHeelDistanceThreshold) continue
+
+          const terminalFill = cachedLocalFill(pixel.x, pixel.y)
+          if (terminalFill > 0.36) continue
+
+          const toCenterX = centerX - pixel.x
+          const toCenterY = centerY - pixel.y
+          const toCenterLength = Math.hypot(toCenterX, toCenterY) || 1
+          const stemSamples = [0.08, 0.16, 0.25, 0.34].map((ratio) =>
+            cachedLocalFill(pixel.x + toCenterX * ratio, pixel.y + toCenterY * ratio),
+          )
+          const stemFill = stemSamples.reduce((sum, fill) => sum + fill, 0) / stemSamples.length
+          const narrowRun = stemSamples.filter((fill) => fill < 0.36).length
+          const bodyFill = cachedLocalFill(pixel.x + toCenterX * 0.52, pixel.y + toCenterY * 0.52)
+          const projectionOnBodyAxis = (pixel.x - bodyAxis.meanX) * bodyAxis.vx + (pixel.y - bodyAxis.meanY) * bodyAxis.vy
+          const nearBodyAxisMiddle = Math.abs(projectionOnBodyAxis) < bodyAxisLength * 0.64
+          const protrusionScore =
+            (distanceFromCenter / maxDistanceFromCenter) * 1.2 +
+            Math.min(1.4, offAxisDistance / sideHeelDistanceThreshold) * 1.35 +
+            Math.max(0, 0.34 - terminalFill) * 2.4 +
+            narrowRun * 0.48 +
+            Math.max(0, bodyFill - stemFill) * 1.8 +
+            (nearBodyAxisMiddle ? 0.75 : -0.85) +
+            Math.min(1, toCenterLength / boxDiagonal) * 0.55
+
+          if (narrowRun < 2 || bodyFill < stemFill + 0.06 || !nearBodyAxisMiddle) continue
+          if (!bestHeel || protrusionScore > bestHeel.score) {
+            bestHeel = { x: pixel.x, y: pixel.y, score: protrusionScore, stemFill }
+          }
+        }
+        if (!bestHeel || bestHeel.score < 2.65) return null
+
+        let heelBodyAnchor: { x: number; y: number; score: number } | null = null
+        for (const pixel of densePixels) {
+          const distanceFromHeelStem = Math.hypot(pixel.x - bestHeel.x, pixel.y - bestHeel.y)
+          if (distanceFromHeelStem < sideHeelDistanceThreshold * 0.55) continue
+          const offBodyAxis = distanceFromMainShoeAxis(pixel.x, pixel.y)
+          const fill = cachedLocalFill(pixel.x, pixel.y)
+          const score =
+            distanceFromHeelStem +
+            offBodyAxis * 1.2 -
+            fill * radius * 2.5
+          if (!heelBodyAnchor || score < heelBodyAnchor.score) {
+            heelBodyAnchor = { x: pixel.x, y: pixel.y, score }
+          }
+        }
+        if (!heelBodyAnchor) return null
+
+        const projectionOf = (point: { x: number; y: number }) =>
+          (point.x - bodyAxis.meanX) * bodyAxis.vx + (point.y - bodyAxis.meanY) * bodyAxis.vy
+        const heelProjection = projectionOf(heelBodyAnchor)
+        let minProjectionPixel: { x: number; y: number; projection: number; score: number } | null = null
+        let maxProjectionPixel: { x: number; y: number; projection: number; score: number } | null = null
+        for (const pixel of densePixels) {
+          const projection = projectionOf(pixel)
+          const endpointFill = cachedLocalFill(pixel.x, pixel.y)
+          const offBodyAxis = distanceFromMainShoeAxis(pixel.x, pixel.y)
+          const endpointScore = Math.max(0, 0.45 - endpointFill) * radius * 4 - offBodyAxis * 0.18
+          if (!minProjectionPixel || projection < minProjectionPixel.projection || (projection === minProjectionPixel.projection && endpointScore > minProjectionPixel.score)) {
+            minProjectionPixel = { x: pixel.x, y: pixel.y, projection, score: endpointScore }
+          }
+          if (!maxProjectionPixel || projection > maxProjectionPixel.projection || (projection === maxProjectionPixel.projection && endpointScore > maxProjectionPixel.score)) {
+            maxProjectionPixel = { x: pixel.x, y: pixel.y, projection, score: endpointScore }
+          }
+        }
+        if (!minProjectionPixel || !maxProjectionPixel) return null
+        const minDistanceFromHeel = Math.abs(heelProjection - minProjectionPixel.projection)
+        const maxDistanceFromHeel = Math.abs(maxProjectionPixel.projection - heelProjection)
+        const toeEndpoint = maxDistanceFromHeel >= minDistanceFromHeel ? maxProjectionPixel : minProjectionPixel
+        if (Math.hypot(toeEndpoint.x - heelBodyAnchor.x, toeEndpoint.y - heelBodyAnchor.y) < boxDiagonal * 0.32) return null
+
+        const heel = {
+          x: Math.round((heelBodyAnchor.x / width) * 100),
+          y: Math.round((heelBodyAnchor.y / height) * 100),
+        }
+        const toe = {
+          x: Math.round((toeEndpoint.x / width) * 100),
+          y: Math.round((toeEndpoint.y / height) * 100),
+        }
+        const axisLength = Math.hypot(toe.x - heel.x, toe.y - heel.y)
+        if (axisLength < 18) return null
+
+        return {
+          heel,
+          toe,
+          note:
+            'high-heel override: detected narrow protruding heel/stiletto/block-heel structure only as a heel-side clue; HEEL marker is placed on the rear shoe body/counter, and TOE marker is the opposite pointed shoe front along the shoe body direction',
+        }
       }
       const expandBox = (component: HandAngleComponent, ratio = 0.08) => {
         const boxWidth = component.maxX - component.minX + 1
@@ -4378,12 +4691,491 @@ function App() {
       }
       const boxesOverlap = (a: HandAngleComponent, b: HandAngleComponent) =>
         a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY
+      const unionBox = (a: HandAngleComponent, b: HandAngleComponent): HandAngleComponent => ({
+        minX: Math.min(a.minX, b.minX),
+        minY: Math.min(a.minY, b.minY),
+        maxX: Math.max(a.maxX, b.maxX),
+        maxY: Math.max(a.maxY, b.maxY),
+        count: a.count + b.count,
+      })
+      const componentAreaRatio = (component: HandAngleComponent) => component.count / (width * height)
+      const boxAreaRatio = (component: HandAngleComponent) => {
+        const boxWidth = component.maxX - component.minX + 1
+        const boxHeight = component.maxY - component.minY + 1
+        return (boxWidth * boxHeight) / (width * height)
+      }
+      const boxCenterDistance = (a: HandAngleComponent, b: HandAngleComponent) => {
+        const ax = (a.minX + a.maxX) / 2 / width
+        const ay = (a.minY + a.maxY) / 2 / height
+        const bx = (b.minX + b.maxX) / 2 / width
+        const by = (b.minY + b.maxY) / 2 / height
+        return Math.hypot(ax - bx, ay - by)
+      }
+      const overlapAreaRatio = (a: HandAngleComponent, b: HandAngleComponent) => {
+        const x1 = Math.max(a.minX, b.minX)
+        const y1 = Math.max(a.minY, b.minY)
+        const x2 = Math.min(a.maxX, b.maxX)
+        const y2 = Math.min(a.maxY, b.maxY)
+        if (x2 < x1 || y2 < y1) return 0
+        const overlap = (x2 - x1 + 1) * (y2 - y1 + 1)
+        const aArea = (a.maxX - a.minX + 1) * (a.maxY - a.minY + 1)
+        const bArea = (b.maxX - b.minX + 1) * (b.maxY - b.minY + 1)
+        return overlap / Math.min(aArea, bArea)
+      }
+      const refineHandAngleShoes = (
+        components: HandAngleComponent[],
+        blueAnchors: HandAngleComponent[] = [],
+        greenAnchors: HandAngleComponent[] = [],
+      ) => {
+        const sorted = [...components].sort((a, b) => b.count - a.count)
+        const largestCount = sorted[0]?.count || 0
+        const refined: HandAngleComponent[] = []
+        let ignoredHeelFragments = 0
+        const componentCenterY = (component: HandAngleComponent) => (component.minY + component.maxY) / 2
+        const unionMany = (items: HandAngleComponent[]) => items.reduce((merged, item) => unionBox(merged, item))
+        for (const component of sorted) {
+          const boxWidth = component.maxX - component.minX + 1
+          const boxHeight = component.maxY - component.minY + 1
+          const smallComparedWithMain = largestCount > 0 && component.count < largestCount * 0.32
+          const smallAbsoluteFragment =
+            componentAreaRatio(component) < 0.0055 ||
+            boxAreaRatio(component) < 0.026 ||
+            Math.min(boxWidth / width, boxHeight / height) < 0.045
+          const heelLikeFragment = smallComparedWithMain && smallAbsoluteFragment
+          const mergeIndex = refined.findIndex((existing) => {
+            const expandedOverlap = overlapAreaRatio(expandBox(component, 0.32), expandBox(existing, 0.22)) > 0
+            const closeToMainShoe = boxCenterDistance(component, existing) < 0.2
+            return heelLikeFragment && (expandedOverlap || closeToMainShoe)
+          })
+          if (mergeIndex >= 0) {
+            refined[mergeIndex] = unionBox(refined[mergeIndex], component)
+            if (heelLikeFragment) ignoredHeelFragments += 1
+            continue
+          }
+          const isolatedTinyDetail =
+            heelLikeFragment &&
+            componentAreaRatio(component) < 0.0012 &&
+            boxAreaRatio(component) < 0.008 &&
+            refined.length > 0
+          if (isolatedTinyDetail) {
+            ignoredHeelFragments += 1
+            continue
+          }
+          refined.push(component)
+        }
+        if (blueAnchors.length === 0 && greenAnchors.length > 0 && refined.length > 2) {
+          const totalCount = refined.reduce((sum, component) => sum + component.count, 0)
+          let upperCenter = Math.min(...refined.map(componentCenterY))
+          let lowerCenter = Math.max(...refined.map(componentCenterY))
+          let upperGroup: HandAngleComponent[] = []
+          let lowerGroup: HandAngleComponent[] = []
+          for (let iteration = 0; iteration < 8; iteration += 1) {
+            upperGroup = []
+            lowerGroup = []
+            for (const component of refined) {
+              const centerY = componentCenterY(component)
+              if (Math.abs(centerY - upperCenter) <= Math.abs(centerY - lowerCenter)) upperGroup.push(component)
+              else lowerGroup.push(component)
+            }
+            if (!upperGroup.length || !lowerGroup.length) break
+            upperCenter = upperGroup.reduce((sum, component) => sum + componentCenterY(component) * component.count, 0) / upperGroup.reduce((sum, component) => sum + component.count, 0)
+            lowerCenter = lowerGroup.reduce((sum, component) => sum + componentCenterY(component) * component.count, 0) / lowerGroup.reduce((sum, component) => sum + component.count, 0)
+            if (upperCenter > lowerCenter) {
+              const tempCenter = upperCenter
+              upperCenter = lowerCenter
+              lowerCenter = tempCenter
+            }
+          }
+          if (upperGroup.length && lowerGroup.length) {
+            const upperShoe = unionMany(upperGroup)
+            const lowerShoe = unionMany(lowerGroup)
+            const centerGap = boxCenterDistance(upperShoe, lowerShoe)
+            const upperRatio = upperShoe.count / Math.max(1, totalCount)
+            const lowerRatio = lowerShoe.count / Math.max(1, totalCount)
+            const combinedHeight = Math.max(upperShoe.maxY, lowerShoe.maxY) - Math.min(upperShoe.minY, lowerShoe.minY) + 1
+            const looksLikeTwoStackedDisplayShoes =
+              centerGap > 0.14 &&
+              upperRatio > 0.18 &&
+              lowerRatio > 0.18 &&
+              combinedHeight > height * 0.32
+            if (looksLikeTwoStackedDisplayShoes) {
+              return {
+                shoes: [upperShoe, lowerShoe].sort((a, b) => b.count - a.count),
+                ignoredHeelFragments,
+              }
+            }
+          }
+        }
+        return {
+          shoes: refined.sort((a, b) => b.count - a.count).slice(0, 8),
+          ignoredHeelFragments,
+        }
+      }
+      const componentFromPixels = (pixels: Array<{ x: number; y: number }>): HandAngleComponent | null => {
+        if (!pixels.length) return null
+        let minX = width
+        let minY = height
+        let maxX = 0
+        let maxY = 0
+        for (const pixel of pixels) {
+          minX = Math.min(minX, pixel.x)
+          minY = Math.min(minY, pixel.y)
+          maxX = Math.max(maxX, pixel.x)
+          maxY = Math.max(maxY, pixel.y)
+        }
+        return { minX, minY, maxX, maxY, count: pixels.length }
+      }
+      const splitLargeHandAngleShoeMass = (component: HandAngleComponent): HandAngleComponent[] => {
+        const boxWidth = component.maxX - component.minX + 1
+        const boxHeight = component.maxY - component.minY + 1
+        const isLargeMass =
+          componentAreaRatio(component) > 0.035 &&
+          boxWidth > width * 0.25 &&
+          boxHeight > height * 0.28
+        const isWideLayeredMass =
+          componentAreaRatio(component) > 0.024 &&
+          boxWidth > width * 0.36 &&
+          boxHeight > height * 0.16
+        if (!isLargeMass && !isWideLayeredMass) return [component]
+        const pixels: Array<{ x: number; y: number }> = []
+        for (let y = component.minY; y <= component.maxY; y += 1) {
+          for (let x = component.minX; x <= component.maxX; x += 1) {
+            const index = y * width + x
+            if (masks.yellow[index]) pixels.push({ x, y })
+          }
+        }
+        if (!pixels.length) return [component]
+        const validateSplitPieces = (pieces: HandAngleComponent[], minCountRatio = 0.12, minBoxRatio = 0.014, minCenterGap = 0.1) => {
+          const valid = pieces.filter((piece) => {
+            const pieceWidth = piece.maxX - piece.minX + 1
+            const pieceHeight = piece.maxY - piece.minY + 1
+            return (
+              piece.count > component.count * minCountRatio &&
+              boxAreaRatio(piece) > minBoxRatio &&
+              pieceWidth > width * 0.1 &&
+              pieceHeight > height * 0.075
+            )
+          })
+          if (valid.length < 2) return null
+          const centerGap = Math.max(
+            ...valid.flatMap((piece, pieceIndex) =>
+              valid.slice(pieceIndex + 1).map((other) => boxCenterDistance(piece, other)),
+            ),
+          )
+          const balance = Math.min(...valid.map((piece) => piece.count)) / Math.max(...valid.map((piece) => piece.count))
+          if (centerGap < minCenterGap || balance < 0.18) return null
+          return valid
+        }
+        const splitWideLayeredShoes = () => {
+          if (!isWideLayeredMass) return null
+          const componentBox = expandBox(component, 0.025)
+          const touchingBlueCount = bodyCandidates.filter((candidate) => boxesOverlap(componentBox, expandBox(candidate, 0.04))).length
+          const touchingGreenCount = greenHandCandidates.filter((candidate) => boxesOverlap(componentBox, expandBox(candidate, 0.04))).length
+          const bins = new Array(boxHeight).fill(0)
+          for (const pixel of pixels) bins[pixel.y - component.minY] += 1
+          const maxBin = Math.max(...bins)
+          let centerA = component.minY + boxHeight * 0.35
+          let centerB = component.minY + boxHeight * 0.72
+          let topPixels: Array<{ x: number; y: number }> = []
+          let bottomPixels: Array<{ x: number; y: number }> = []
+          for (let iteration = 0; iteration < 8; iteration += 1) {
+            topPixels = []
+            bottomPixels = []
+            for (const pixel of pixels) {
+              if (Math.abs(pixel.y - centerA) <= Math.abs(pixel.y - centerB)) topPixels.push(pixel)
+              else bottomPixels.push(pixel)
+            }
+            if (!topPixels.length || !bottomPixels.length) return null
+            centerA = topPixels.reduce((sum, pixel) => sum + pixel.y, 0) / topPixels.length
+            centerB = bottomPixels.reduce((sum, pixel) => sum + pixel.y, 0) / bottomPixels.length
+            if (centerA > centerB) {
+              const tempCenter = centerA
+              centerA = centerB
+              centerB = tempCenter
+            }
+          }
+          const cutY = Math.round((centerA + centerB) / 2)
+          const valleyWindow = Math.max(1, Math.round(boxHeight * 0.035))
+          let valley = 0
+          let valleySamples = 0
+          for (let y = cutY - valleyWindow; y <= cutY + valleyWindow; y += 1) {
+            if (y < component.minY || y > component.maxY) continue
+            valley += bins[y - component.minY]
+            valleySamples += 1
+          }
+          const valleyAverage = valley / Math.max(1, valleySamples)
+          const centersFarEnough = Math.abs(centerB - centerA) / height > 0.075
+          const allowDenseOverlapSplit = touchingBlueCount >= 2 && boxWidth > width * 0.42
+          const allowHandDisplaySplit =
+            touchingBlueCount === 0 &&
+            touchingGreenCount > 0 &&
+            boxHeight > height * 0.38 &&
+            boxWidth > width * 0.34
+          if (!centersFarEnough || (!allowDenseOverlapSplit && !allowHandDisplaySplit && valleyAverage > maxBin * 0.78)) return null
+          const pieces = validateSplitPieces(
+            [componentFromPixels(topPixels), componentFromPixels(bottomPixels)].filter((piece): piece is HandAngleComponent => Boolean(piece)),
+            allowDenseOverlapSplit || allowHandDisplaySplit ? 0.11 : 0.16,
+            allowDenseOverlapSplit || allowHandDisplaySplit ? 0.012 : 0.018,
+            allowDenseOverlapSplit || allowHandDisplaySplit ? 0.06 : 0.1,
+          )
+          return pieces
+        }
+        const splitByHandFootAnchors = () => {
+          const componentBox = expandBox(component, 0.025)
+          const blueAnchors = bodyCandidates.filter((candidate) => boxesOverlap(componentBox, expandBox(candidate, 0.04)))
+          const greenAnchors = greenHandCandidates.filter((candidate) => boxesOverlap(componentBox, expandBox(candidate, 0.04)))
+          if (!blueAnchors.length || !greenAnchors.length) return null
+          const center = (item: HandAngleComponent) => ({
+            x: (item.minX + item.maxX) / 2,
+            y: (item.minY + item.maxY) / 2,
+          })
+          const componentCenter = center(component)
+          const nearestToComponent = (items: HandAngleComponent[]) =>
+            [...items].sort((a, b) => {
+              const ac = center(a)
+              const bc = center(b)
+              return Math.hypot(ac.x - componentCenter.x, ac.y - componentCenter.y) - Math.hypot(bc.x - componentCenter.x, bc.y - componentCenter.y)
+            })[0]
+          const blueCenter = center(nearestToComponent(blueAnchors))
+          const greenCenter = center(nearestToComponent(greenAnchors))
+          const anchorGap = Math.hypot((greenCenter.x - blueCenter.x) / width, (greenCenter.y - blueCenter.y) / height)
+          if (anchorGap < 0.14) return null
+          const midX = (blueCenter.x + greenCenter.x) / 2
+          const midY = (blueCenter.y + greenCenter.y) / 2
+          const vectorX = greenCenter.x - blueCenter.x
+          const vectorY = greenCenter.y - blueCenter.y
+          const bluePixels: Array<{ x: number; y: number }> = []
+          const greenPixels: Array<{ x: number; y: number }> = []
+          for (const pixel of pixels) {
+            const score = (pixel.x - midX) * vectorX + (pixel.y - midY) * vectorY
+            if (score >= 0) greenPixels.push(pixel)
+            else bluePixels.push(pixel)
+          }
+          const bluePiece = componentFromPixels(bluePixels)
+          const greenPiece = componentFromPixels(greenPixels)
+          if (!bluePiece || !greenPiece) return null
+          const pieces = validateSplitPieces([bluePiece, greenPiece], 0.14, 0.016)
+          return pieces
+        }
+        const splitByAnchors = splitByHandFootAnchors()
+        if (splitByAnchors) return splitByAnchors
+        const splitByLayeredShoes = splitWideLayeredShoes()
+        if (splitByLayeredShoes) return splitByLayeredShoes
+        const findMaskComponents = (mask: Uint8Array, minCount: number) => {
+          const visited = new Uint8Array(mask.length)
+          const components: Array<HandAngleComponent & { pixels: Array<{ x: number; y: number }> }> = []
+          for (let startIndex = 0; startIndex < mask.length; startIndex += 1) {
+            if (!mask[startIndex] || visited[startIndex]) continue
+            const queue = [startIndex]
+            const piecePixels: Array<{ x: number; y: number }> = []
+            visited[startIndex] = 1
+            let cursor = 0
+            let minX = width
+            let minY = height
+            let maxX = 0
+            let maxY = 0
+            while (cursor < queue.length) {
+              const current = queue[cursor++]
+              const x = current % width
+              const y = Math.floor(current / width)
+              piecePixels.push({ x, y })
+              minX = Math.min(minX, x)
+              minY = Math.min(minY, y)
+              maxX = Math.max(maxX, x)
+              maxY = Math.max(maxY, y)
+              const neighbors = [current - 1, current + 1, current - width, current + width]
+              for (const next of neighbors) {
+                if (next < 0 || next >= mask.length || visited[next] || !mask[next]) continue
+                const nx = next % width
+                if (Math.abs(nx - x) > 1) continue
+                visited[next] = 1
+                queue.push(next)
+              }
+            }
+            if (piecePixels.length >= minCount) {
+              components.push({ minX, minY, maxX, maxY, count: piecePixels.length, pixels: piecePixels })
+            }
+          }
+          return components.sort((a, b) => b.count - a.count)
+        }
+        const bridgeCleanedMask = new Uint8Array(masks.yellow.length)
+        for (const pixel of pixels) {
+          let near3 = 0
+          let near5 = 0
+          for (let dy = -2; dy <= 2; dy += 1) {
+            const yy = pixel.y + dy
+            if (yy < component.minY || yy > component.maxY) continue
+            for (let dx = -2; dx <= 2; dx += 1) {
+              const xx = pixel.x + dx
+              if (xx < component.minX || xx > component.maxX) continue
+              if (!masks.yellow[yy * width + xx]) continue
+              near5 += 1
+              if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) near3 += 1
+            }
+          }
+          if (near3 >= 5 || near5 >= 12) bridgeCleanedMask[pixel.y * width + pixel.x] = 1
+        }
+        const cleanedPieces = findMaskComponents(bridgeCleanedMask, Math.max(24, component.count * 0.06))
+          .filter((piece) => {
+            const pieceWidth = piece.maxX - piece.minX + 1
+            const pieceHeight = piece.maxY - piece.minY + 1
+            return (
+              piece.count > component.count * 0.08 &&
+              boxAreaRatio(piece) > 0.012 &&
+              pieceWidth > width * 0.08 &&
+              pieceHeight > height * 0.08
+            )
+          })
+        if (cleanedPieces.length >= 2) {
+          const seeds = cleanedPieces.slice(0, 2).map((piece) => {
+            const centerX = (piece.minX + piece.maxX) / 2
+            const centerY = (piece.minY + piece.maxY) / 2
+            return { piece, centerX, centerY }
+          })
+          const centerGap = Math.max(
+            ...seeds.flatMap((seed, seedIndex) =>
+              seeds.slice(seedIndex + 1).map((other) =>
+                Math.hypot((seed.centerX - other.centerX) / width, (seed.centerY - other.centerY) / height),
+              ),
+            ),
+          )
+          const balance = Math.min(...seeds.map((seed) => seed.piece.count)) / Math.max(...seeds.map((seed) => seed.piece.count))
+          if (centerGap > 0.15 && balance > 0.18) {
+            const groups = seeds.map(() => [] as Array<{ x: number; y: number }>)
+            for (const pixel of pixels) {
+              let bestIndex = 0
+              let bestDistance = Number.POSITIVE_INFINITY
+              seeds.forEach((seed, seedIndex) => {
+                const dx = (pixel.x - seed.centerX) / width
+                const dy = (pixel.y - seed.centerY) / height
+                const distance = dx * dx + dy * dy
+                if (distance < bestDistance) {
+                  bestDistance = distance
+                  bestIndex = seedIndex
+                }
+              })
+              groups[bestIndex].push(pixel)
+            }
+            const splitByCleanedIslands = groups
+              .map(componentFromPixels)
+              .filter((piece): piece is HandAngleComponent => Boolean(piece))
+              .filter((piece) => {
+                const pieceWidth = piece.maxX - piece.minX + 1
+                const pieceHeight = piece.maxY - piece.minY + 1
+                return (
+                  piece.count > component.count * 0.12 &&
+                  boxAreaRatio(piece) > 0.016 &&
+                  pieceWidth > width * 0.1 &&
+                  pieceHeight > height * 0.1
+                )
+              })
+            if (splitByCleanedIslands.length >= 2) return splitByCleanedIslands
+          }
+        }
+        const candidates: Array<{ axis: 'x' | 'y'; cut: number; score: number; before: HandAngleComponent; after: HandAngleComponent }> = []
+        const evaluateAxis = (axis: 'x' | 'y') => {
+          const min = axis === 'x' ? component.minX : component.minY
+          const max = axis === 'x' ? component.maxX : component.maxY
+          const size = max - min + 1
+          if (size < 80) return
+          const bins = new Array(size).fill(0)
+          for (const pixel of pixels) bins[(axis === 'x' ? pixel.x : pixel.y) - min] += 1
+          const maxBin = Math.max(...bins)
+          const from = Math.max(1, Math.round(size * 0.28))
+          const to = Math.min(size - 2, Math.round(size * 0.78))
+          for (let local = from; local <= to; local += 1) {
+            const cut = min + local
+            const beforePixels = pixels.filter((pixel) => (axis === 'x' ? pixel.x <= cut : pixel.y <= cut))
+            const afterPixels = pixels.filter((pixel) => (axis === 'x' ? pixel.x > cut : pixel.y > cut))
+            const before = componentFromPixels(beforePixels)
+            const after = componentFromPixels(afterPixels)
+            if (!before || !after) continue
+            const beforeArea = componentAreaRatio(before)
+            const afterArea = componentAreaRatio(after)
+            const beforeBox = boxAreaRatio(before)
+            const afterBox = boxAreaRatio(after)
+            const centerGap = axis === 'x'
+              ? Math.abs(((before.minX + before.maxX) / 2 - (after.minX + after.maxX) / 2) / width)
+              : Math.abs(((before.minY + before.maxY) / 2 - (after.minY + after.maxY) / 2) / height)
+            const valley = bins[local]
+            const bothLookLikeShoes =
+              beforeArea > 0.006 &&
+              afterArea > 0.006 &&
+              beforeBox > 0.02 &&
+              afterBox > 0.02 &&
+              centerGap > 0.16
+            const narrowBridge = valley < Math.max(10, maxBin * 0.36)
+            if (!bothLookLikeShoes || !narrowBridge) continue
+            const balance = Math.min(before.count, after.count) / Math.max(before.count, after.count)
+            const score = centerGap * 2 + balance - valley / Math.max(1, maxBin)
+            candidates.push({ axis, cut, score, before, after })
+          }
+        }
+        evaluateAxis('y')
+        evaluateAxis('x')
+        candidates.sort((a, b) => b.score - a.score)
+        const best = candidates[0]
+        return best ? [best.before, best.after] : [component]
+      }
+      void refineHandAngleShoes
+      void splitLargeHandAngleShoeMass
       const touchIndexes = (component: HandAngleComponent, others: HandAngleComponent[], ratio = 0.08) => {
         const expanded = expandBox(component, ratio)
         return others
           .map((other, index) => ({ other, index }))
           .filter(({ other }) => boxesOverlap(expanded, expandBox(other, ratio)))
           .map(({ index }) => index)
+      }
+      const pixelTouchStats = (
+        component: HandAngleComponent,
+        ownMask: Uint8Array,
+        targetMask: Uint8Array,
+        others: HandAngleComponent[],
+        radius = 2,
+        minTouchPixels = 1,
+      ) => others
+        .map((other, index) => {
+          const expandedOther = expandBox(other, 0)
+          let touchedPixels = 0
+          for (let y = component.minY; y <= component.maxY; y += 1) {
+            for (let x = component.minX; x <= component.maxX; x += 1) {
+              if (!ownMask[y * width + x]) continue
+              if (x < expandedOther.minX - radius || x > expandedOther.maxX + radius || y < expandedOther.minY - radius || y > expandedOther.maxY + radius) continue
+              let touched = false
+              for (let dy = -radius; dy <= radius; dy += 1) {
+                const yy = y + dy
+                if (yy < other.minY || yy > other.maxY || yy < 0 || yy >= height) continue
+                for (let dx = -radius; dx <= radius; dx += 1) {
+                  const xx = x + dx
+                  if (xx < other.minX || xx > other.maxX || xx < 0 || xx >= width) continue
+                  if (targetMask[yy * width + xx]) {
+                    touched = true
+                    break
+                  }
+                }
+                if (touched) break
+              }
+              if (touched) touchedPixels += 1
+            }
+          }
+          return { index, touchedPixels }
+        })
+        .filter((item) => item.touchedPixels >= minTouchPixels)
+      const shoeBlueTouchStats = (component: HandAngleComponent) =>
+        pixelTouchStats(component, masks.yellow, masks.blue, bodyCandidates, 1, Math.max(18, Math.round(component.count * 0.0018)))
+      const shoeGreenTouchStats = (component: HandAngleComponent) =>
+        pixelTouchStats(component, masks.yellow, masks.green, greenHandCandidates, 2, Math.max(8, Math.round(component.count * 0.0008)))
+      const resolveHandAngleShoeRole = (component: HandAngleComponent) => {
+        const blueStats = shoeBlueTouchStats(component)
+        const greenStats = shoeGreenTouchStats(component)
+        const touchingBlue = blueStats.map((item) => item.index)
+        const touchingGreen = greenStats.map((item) => item.index)
+        const blueScore = blueStats.reduce((sum, item) => sum + item.touchedPixels, 0)
+        const greenScore = greenStats.reduce((sum, item) => sum + item.touchedPixels, 0)
+        const weakBlueTouch = blueScore < Math.max(42, Math.round(component.count * 0.004))
+        if (touchingGreen.length && (!touchingBlue.length || greenScore >= blueScore * 0.45 || weakBlueTouch)) return { role: 'hand' as const, touchingBlue, touchingGreen }
+        if (touchingBlue.length) return { role: 'foot' as const, touchingBlue, touchingGreen }
+        return { role: 'display' as const, touchingBlue, touchingGreen }
       }
       const drawMask = (ctx: CanvasRenderingContext2D, mask: Uint8Array, components: HandAngleComponent[], stroke: string, fill: string) => {
         ctx.save()
@@ -4416,10 +5208,52 @@ function App() {
         ctx.fillText(text, safeX, safeY)
       }
 
-      const shoes = findComponents(masks.yellow, 0.0012).slice(0, 8)
+      const rawYellowComponents = findComponents(masks.yellow, 0.0005).slice(0, 14)
+      const rawBluePixelCount = masks.blue.reduce((sum, value) => sum + value, 0)
+      const handAngleNoBlueRegion = rawBluePixelCount < Math.max(16, width * height * 0.00004)
       const bodyCandidates = findComponents(masks.blue, 0.0012).slice(0, 10)
+      const handAngleNoValidBlueFootLeg = bodyCandidates.length === 0
       const greenHandCandidates = findComponents(masks.green, 0.0012).slice(0, 10)
       const clothes = findComponents(masks.red, 0.002).slice(0, 6)
+      const resolveMainHandAngleShoes = (components: HandAngleComponent[]) => {
+        if (components.length <= 2) return { mainShoes: components.slice(0, 8), ignoredFragments: [] as HandAngleComponent[] }
+        const largestCount = Math.max(...components.map((component) => component.count), 1)
+        const imageArea = Math.max(1, width * height)
+        const componentInfo = components.map((component) => {
+          const box = metrics(component)
+          const boxArea = box.boxWidth * box.boxHeight
+          const areaRatio = component.count / imageArea
+          const countRatio = component.count / largestCount
+          const longSide = Math.max(box.boxWidth, box.boxHeight)
+          const shortSide = Math.min(box.boxWidth, box.boxHeight)
+          const looksLikeFullShoe =
+            areaRatio >= 0.0022 &&
+            countRatio >= 0.09 &&
+            boxArea >= 130 &&
+            longSide >= 14 &&
+            shortSide >= 6
+          const tinyDetail =
+            areaRatio < 0.0022 ||
+            countRatio < 0.09 ||
+            boxArea < 130 ||
+            longSide < 12 ||
+            shortSide < 5
+          return { component, box, boxArea, areaRatio, countRatio, looksLikeFullShoe, tinyDetail }
+        })
+        let mainInfos = componentInfo.filter((item) => item.looksLikeFullShoe)
+        if (!mainInfos.length) {
+          mainInfos = [...componentInfo]
+            .sort((a, b) => b.component.count - a.component.count)
+            .slice(0, Math.min(2, componentInfo.length))
+        }
+        const mainSet = new Set(mainInfos.map((item) => item.component))
+        const ignoredFragments = componentInfo
+          .filter((item) => !mainSet.has(item.component) || item.tinyDetail)
+          .filter((item) => !mainSet.has(item.component))
+          .map((item) => item.component)
+        return { mainShoes: mainInfos.map((item) => item.component).slice(0, 8), ignoredFragments }
+      }
+      const { mainShoes: shoes, ignoredFragments: ignoredYellowDetailFragments } = resolveMainHandAngleShoes(rawYellowComponents)
       const blueClassifications = bodyCandidates.map(() => ({
         kind: 'FOOT/LEG',
         reason: 'hand-angle channel color lock: blue regions are always leg/foot/ankle; only green regions can be hand/wrist/fingers',
@@ -4428,15 +5262,224 @@ function App() {
         kind: 'HAND',
         reason: 'explicit green region in hand-angle upload; green is directly locked as hand/wrist/fingers',
       }))
+      const shoeRoleInfos = shoes.map((component) => resolveHandAngleShoeRole(component))
+      const distanceToComponentCenter = (point: { x: number; y: number }, component: HandAngleComponent) => {
+        const centerX = Math.round((((component.minX + component.maxX) / 2) / width) * 100)
+        const centerY = Math.round((((component.minY + component.maxY) / 2) / height) * 100)
+        return Math.hypot(point.x - centerX, point.y - centerY)
+      }
+      void distanceToComponentCenter
+      const blueContactPointForShoe = (
+        shoe: HandAngleComponent,
+        blueIndexes: number[],
+        radius = 2,
+      ) => {
+        const blueSet = new Set(blueIndexes)
+        let count = 0
+        let sumX = 0
+        let sumY = 0
+        for (let y = shoe.minY; y <= shoe.maxY; y += 1) {
+          for (let x = shoe.minX; x <= shoe.maxX; x += 1) {
+            if (!masks.yellow[y * width + x]) continue
+            let touchesBlue = false
+            for (const blueIndex of blueSet) {
+              const blue = bodyCandidates[blueIndex]
+              if (!blue) continue
+              if (x < blue.minX - radius || x > blue.maxX + radius || y < blue.minY - radius || y > blue.maxY + radius) continue
+              for (let dy = -radius; dy <= radius; dy += 1) {
+                const yy = y + dy
+                if (yy < blue.minY || yy > blue.maxY || yy < 0 || yy >= height) continue
+                for (let dx = -radius; dx <= radius; dx += 1) {
+                  const xx = x + dx
+                  if (xx < blue.minX || xx > blue.maxX || xx < 0 || xx >= width) continue
+                  if (masks.blue[yy * width + xx]) {
+                    touchesBlue = true
+                    break
+                  }
+                }
+                if (touchesBlue) break
+              }
+              if (touchesBlue) break
+            }
+            if (!touchesBlue) continue
+            count += 1
+            sumX += x
+            sumY += y
+          }
+        }
+        if (!count) return null
+        return {
+          x: Math.round((sumX / count / width) * 100),
+          y: Math.round((sumY / count / height) * 100),
+        }
+      }
+      const orientShoeAxis = (
+        axis: NonNullable<ReturnType<typeof axisForComponent>>,
+        heel: { x: number; y: number },
+        toe: { x: number; y: number },
+        note: string,
+        forcedToeDirection?: string,
+      ) => ({
+        start: heel,
+        end: toe,
+        direction: forcedToeDirection || handDirectionFromDelta(toe.x - heel.x, toe.y - heel.y),
+        toe,
+        heel,
+        toeDirection: forcedToeDirection || handDirectionFromDelta(toe.x - heel.x, toe.y - heel.y),
+        orientationNote: note || axis.toeDirection,
+      })
+      const axisForHandAngleShoe = (
+        component: HandAngleComponent,
+        roleInfo: ReturnType<typeof resolveHandAngleShoeRole>,
+        preferredAxis?: ReturnType<typeof axisForComponent>,
+      ) => {
+        const axis = axisForComponent(masks.yellow, component)
+        if (!axis) return null
+        const highHeelAxis = detectHighHeelToeHeel(masks.yellow, component)
+        if (highHeelAxis) {
+          return orientShoeAxis(axis, highHeelAxis.heel, highHeelAxis.toe, highHeelAxis.note)
+        }
+        if (roleInfo.role === 'foot' && roleInfo.touchingBlue.length) {
+          const contactPoint = blueContactPointForShoe(component, roleInfo.touchingBlue)
+          if (contactPoint) {
+            const startDistance = Math.hypot(axis.start.x - contactPoint.x, axis.start.y - contactPoint.y)
+            const endDistance = Math.hypot(axis.end.x - contactPoint.x, axis.end.y - contactPoint.y)
+            const heel = startDistance <= endDistance ? axis.start : axis.end
+            const toe = heel === axis.start ? axis.end : axis.start
+            return orientShoeAxis(axis, heel, toe, 'worn shoe: heel side is closest to the actual yellow-blue foot contact pixels; opposite endpoint is toe/front')
+          }
+        }
+        if (preferredAxis) {
+          const preferredX = preferredAxis.toe.x - preferredAxis.heel.x
+          const preferredY = preferredAxis.toe.y - preferredAxis.heel.y
+          const startToEndScore = (axis.end.x - axis.start.x) * preferredX + (axis.end.y - axis.start.y) * preferredY
+          const endToStartScore = (axis.start.x - axis.end.x) * preferredX + (axis.start.y - axis.end.y) * preferredY
+          const heel = startToEndScore >= endToStartScore ? axis.start : axis.end
+          const toe = heel === axis.start ? axis.end : axis.start
+          return orientShoeAxis(axis, heel, toe, 'display/hand-supported shoe: toe/heel markers follow the actual yellow shoe long axis and choose the endpoint closest to the worn-shoe direction')
+        }
+        return orientShoeAxis(axis, axis.heel, axis.toe, 'shape-inferred toe/front direction')
+      }
+      const primaryWornShoeIndex = shoeRoleInfos.findIndex((roleInfo) => roleInfo.role === 'foot')
+      const primaryWornShoeAxis = primaryWornShoeIndex >= 0
+        ? axisForHandAngleShoe(shoes[primaryWornShoeIndex], shoeRoleInfos[primaryWornShoeIndex])
+        : null
+      const shoeAxes = shoes.map((component, index) =>
+        axisForHandAngleShoe(
+          component,
+          shoeRoleInfos[index],
+          shoeRoleInfos[index]?.role === 'foot' ? null : primaryWornShoeAxis,
+        ),
+      )
+      const clampPercent = (value: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(value)))
+      const shoePairCenter = shoes.length
+        ? shoes.reduce((center, component) => {
+            const box = metrics(component)
+            return { x: center.x + box.centerX / shoes.length, y: center.y + box.centerY / shoes.length }
+          }, { x: 0, y: 0 })
+        : { x: 50, y: 50 }
+      const buckleGuides = shoes.map((component, index) => {
+        const axis = shoeAxes[index]
+        if (!axis) return null
+        const box = metrics(component)
+        const axisX = axis.toe.x - axis.heel.x
+        const axisY = axis.toe.y - axis.heel.y
+        const axisLength = Math.hypot(axisX, axisY) || 1
+        const perpA = { x: -axisY / axisLength, y: axisX / axisLength }
+        const perpB = { x: axisY / axisLength, y: -axisX / axisLength }
+        const base = {
+          x: axis.heel.x + axisX * 0.52,
+          y: axis.heel.y + axisY * 0.52,
+        }
+        const offset = Math.max(4, Math.min(12, Math.min(Math.max(1, box.boxWidth), Math.max(1, box.boxHeight)) * 0.34))
+        const candidateA = { x: base.x + perpA.x * offset, y: base.y + perpA.y * offset }
+        const candidateB = { x: base.x + perpB.x * offset, y: base.y + perpB.y * offset }
+        const distanceFromPairCenter = (point: { x: number; y: number }) => Math.hypot(point.x - shoePairCenter.x, point.y - shoePairCenter.y)
+        const outsideCandidate = distanceFromPairCenter(candidateA) >= distanceFromPairCenter(candidateB) ? candidateA : candidateB
+        const canvasSide = outsideCandidate.x < 50 ? 'canvas-left' : outsideCandidate.x > 50 ? 'canvas-right' : 'canvas-center'
+        const shoeSide = outsideCandidate.x < box.centerX ? 'shoe-left-side' : outsideCandidate.x > box.centerX ? 'shoe-right-side' : 'shoe-center-side'
+        return {
+          x: clampPercent(outsideCandidate.x, box.left + 1, box.left + box.boxWidth - 1),
+          y: clampPercent(outsideCandidate.y, box.top + 1, box.top + box.boxHeight - 1),
+          canvasSide,
+          shoeSide,
+          buckleSide: `${shoeSide}/${canvasSide}/outside`,
+          sideRule: shoes.length >= 2
+            ? 'outside side of the left/right shoe pair, away from the other shoe'
+            : 'outer side of this shoe',
+        }
+      })
+      const drawShoeToeHeelGuide = (
+        ctx: CanvasRenderingContext2D,
+        axis: (typeof shoeAxes)[number],
+        buckleGuide: (typeof buckleGuides)[number],
+        label: string,
+      ) => {
+        if (!axis) return
+        const heelX = Math.round((axis.heel.x / 100) * width)
+        const heelY = Math.round((axis.heel.y / 100) * height)
+        const toeX = Math.round((axis.toe.x / 100) * width)
+        const toeY = Math.round((axis.toe.y / 100) * height)
+        const markerRadius = Math.max(12, Math.round(Math.max(width, height) * 0.014))
+        const arrowAngle = Math.atan2(toeY - heelY, toeX - heelX)
+        const arrowHeadLength = Math.max(18, Math.round(Math.max(width, height) * 0.022))
+        ctx.save()
+        ctx.lineWidth = Math.max(4, Math.round(Math.max(width, height) * 0.005))
+        ctx.strokeStyle = '#ff4f5f'
+        ctx.fillStyle = '#ff4f5f'
+        ctx.beginPath()
+        ctx.moveTo(heelX, heelY)
+        ctx.lineTo(toeX, toeY)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(toeX, toeY)
+        ctx.lineTo(toeX - arrowHeadLength * Math.cos(arrowAngle - Math.PI / 6), toeY - arrowHeadLength * Math.sin(arrowAngle - Math.PI / 6))
+        ctx.lineTo(toeX - arrowHeadLength * Math.cos(arrowAngle + Math.PI / 6), toeY - arrowHeadLength * Math.sin(arrowAngle + Math.PI / 6))
+        ctx.closePath()
+        ctx.fill()
+
+        ctx.fillStyle = '#ff4fd8'
+        ctx.strokeStyle = '#ffffff'
+        ctx.lineWidth = Math.max(2, Math.round(Math.max(width, height) * 0.003))
+        ctx.beginPath()
+        ctx.arc(heelX, heelY, markerRadius, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.stroke()
+
+        ctx.fillStyle = '#00e5ff'
+        ctx.beginPath()
+        ctx.arc(toeX, toeY, markerRadius, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.stroke()
+
+        ctx.fillStyle = '#111111'
+        ctx.font = `bold ${Math.max(12, Math.round(width * 0.018))}px Arial`
+        drawSafeLabel(ctx, `${label} HEEL`, heelX + markerRadius + 4, heelY + markerRadius + 4)
+        drawSafeLabel(ctx, `${label} TOE ${axis.toeDirection}`, toeX + markerRadius + 4, toeY + markerRadius + 4)
+        if (buckleGuide) {
+          const buckleX = Math.round((buckleGuide.x / 100) * width)
+          const buckleY = Math.round((buckleGuide.y / 100) * height)
+          ctx.strokeStyle = '#ff9f1c'
+          ctx.fillStyle = 'rgba(255,159,28,0.22)'
+          ctx.lineWidth = Math.max(4, Math.round(Math.max(width, height) * 0.005))
+          ctx.beginPath()
+          ctx.arc(buckleX, buckleY, markerRadius * 0.9, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.stroke()
+          ctx.fillStyle = '#111111'
+          drawSafeLabel(ctx, `${label} BUCKLE`, buckleX + markerRadius + 4, buckleY + markerRadius + 4)
+        }
+        ctx.restore()
+      }
       const controlCanvas = document.createElement('canvas')
       controlCanvas.width = width
       controlCanvas.height = height
       const control = controlCanvas.getContext('2d')
       if (!control) return null
-      control.fillStyle = '#050505'
+      control.fillStyle = '#fbfaf7'
       control.fillRect(0, 0, width, height)
-      control.strokeStyle = 'rgba(255,255,255,0.25)'
-      control.fillStyle = 'rgba(255,255,255,0.86)'
+      control.strokeStyle = 'rgba(20,20,20,0.16)'
+      control.fillStyle = 'rgba(20,20,20,0.72)'
       control.lineWidth = Math.max(1, Math.round(Math.max(width, height) * 0.002))
       control.font = `bold ${Math.max(12, Math.round(width * 0.022))}px Arial`
       ;[0, 25, 50, 75, 100].forEach((value) => {
@@ -4453,23 +5496,21 @@ function App() {
         control.fillText(`X${value}`, Math.min(width - 42, x + 4), 4)
         control.fillText(`Y${value}`, 4, Math.min(height - 20, y + 4))
       })
-      drawMask(control, masks.red, clothes, '#b8b8b8', 'rgba(184,184,184,0.28)')
-      drawMask(control, masks.blue, bodyCandidates, '#d8d8d8', 'rgba(216,216,216,0.26)')
-      drawMask(control, masks.green, greenHandCandidates, '#eeeeee', 'rgba(238,238,238,0.3)')
-      drawMask(control, masks.yellow, shoes, '#ffffff', 'rgba(255,255,255,0.22)')
-      control.fillStyle = '#ffffff'
+      drawMask(control, masks.red, clothes, '#8c8c8c', 'rgba(150,150,150,0.13)')
+      drawMask(control, masks.blue, bodyCandidates, '#757575', 'rgba(130,130,130,0.12)')
+      drawMask(control, masks.green, greenHandCandidates, '#666666', 'rgba(120,120,120,0.12)')
+      drawMask(control, masks.yellow, shoes, '#4f4f4f', 'rgba(110,110,110,0.11)')
+      shoeAxes.forEach((axis, index) => drawShoeToeHeelGuide(control, axis, buckleGuides[index], `S${index + 1}`))
+      control.fillStyle = '#111111'
       control.textBaseline = 'top'
       control.font = `bold ${Math.max(15, Math.round(width * 0.026))}px Arial`
       shoes.forEach((component, index) => {
-        const touchingBlue = touchIndexes(component, bodyCandidates, 0.08)
-        const touchingGreen = touchIndexes(component, greenHandCandidates, 0.08)
-        const label = touchingBlue.length && touchingGreen.length
-          ? `S${index + 1} SHOE / HAND + FOOT`
-          : touchingGreen.length
+        const roleInfo = shoeRoleInfos[index]
+        const label = roleInfo.role === 'foot'
+          ? `S${index + 1} SHOE / FOOT`
+          : roleInfo.role === 'hand'
             ? `S${index + 1} SHOE / HAND`
-            : touchingBlue.length
-              ? `S${index + 1} SHOE / FOOT`
-              : `S${index + 1} DISPLAY`
+            : `S${index + 1} DISPLAY`
         drawSafeLabel(control, label, component.minX + 8, component.minY + 8)
       })
       control.font = `bold ${Math.max(12, Math.round(width * 0.019))}px Arial`
@@ -4488,49 +5529,190 @@ function App() {
       const controlFile = new File([blob], `${fileName}-hand-control.png`, { type: 'image/png' })
       const shoeLines = shoes.map((component, index) => {
         const box = metrics(component)
-        const axis = axisForComponent(masks.yellow, component)
-        const touchingBlue = touchIndexes(component, bodyCandidates, 0.08).map((blueIndex) => `B${blueIndex + 1}`)
-        const touchingGreen = touchIndexes(component, greenHandCandidates, 0.08).map((greenIndex) => `G${greenIndex + 1}`)
-        return `S${index + 1}: shoe/yellow region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingBlue=${touchingBlue.length ? touchingBlue.join('/') : 'none'}, touchingGreenHands=${touchingGreen.length ? touchingGreen.join('/') : 'none'}. Yellow controls product shoe placement/angle/scale/occlusion only; product shoe appearance comes only from uploaded product shoe.`
+        const axis = shoeAxes[index]
+        const buckleGuide = buckleGuides[index]
+        const roleInfo = shoeRoleInfos[index]
+        const touchingBlue = roleInfo.role === 'foot'
+          ? roleInfo.touchingBlue.map((blueIndex) => `B${blueIndex + 1}`)
+          : []
+        const touchingGreen = roleInfo.touchingGreen.map((greenIndex) => `G${greenIndex + 1}`)
+        const role = roleInfo.role === 'foot'
+          ? 'WORN_ON_FOOT: generate this S as a product shoe worn on the blue foot/leg only.'
+          : roleInfo.role === 'hand'
+            ? 'HAND_HELD_OR_HAND_SUPPORTED_DISPLAY: generate this S as a bare display product shoe held or supported by the green hand; do not put a foot, ankle, leg, or toes inside it.'
+            : 'DISPLAY_ONLY: generate this S as a bare standalone product display shoe; do not put a foot, ankle, leg, or toes inside it.'
+        return `S${index + 1}: shoe/yellow region, role=${role}, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), shoeAxis ${axis ? `heel (${axis.heel.x}%,${axis.heel.y}%)->toe/front (${axis.toe.x}%,${axis.toe.y}%), toeDirection ${axis.toeDirection}, orientationReason=${axis.orientationNote}` : 'unknown'}, buckle/clasp guide ${buckleGuide ? `orange marker at (${buckleGuide.x}%,${buckleGuide.y}%), buckleSide=${buckleGuide.buckleSide}, sideRule=${buckleGuide.sideRule}. If the uploaded product shoe has a buckle, clasp, ring, strap fastener, buckle holes, or strap anchor point, place that hardware near this orange marker on the shoe ${buckleGuide.shoeSide} / ${buckleGuide.canvasSide} outer side; if the product shoe has no buckle/clasp, ignore this marker.` : 'none'}, touchingBlue=${touchingBlue.length ? touchingBlue.join('/') : 'none'}, touchingGreenHands=${touchingGreen.length ? touchingGreen.join('/') : 'none'}. Yellow controls product shoe placement/angle/scale/occlusion/toeDirection only; product shoe appearance comes only from uploaded product shoe.`
+      })
+      const buckleSideLines = buckleGuides
+        .map((guide, index) => guide ? `S${index + 1} buckleSide=${guide.buckleSide}; buckle/clasp/ring/strap fastener must be near orange marker (${guide.x}%,${guide.y}%) on the shoe outer side.` : '')
+        .filter(Boolean)
+      const shoeDirectionHardLockLines = shoeAxes
+        .map((axis, index) => axis
+          ? `S${index + 1} FINAL DIRECTION LOCK: toe/front endpoint must stay at (${axis.toe.x}%,${axis.toe.y}%), heel endpoint must stay at (${axis.heel.x}%,${axis.heel.y}%), and the visible product shoe must point from heel to toe/front toward ${axis.toeDirection}. If S${index + 1} toe/front appears at the heel endpoint, points the opposite direction, or keeps the uploaded product image original direction instead of this code axis, the result is wrong. Rotate or mirror the uploaded product shoe as needed to put the toe at the TOE endpoint and heel at the HEEL endpoint, while preserving bbox, role, left/right pair, and buckle marker.`
+          : '')
+        .filter(Boolean)
+      const redBoxesForCamera = clothes.map(metrics)
+      const bodyBoxesForCamera = bodyCandidates.map(metrics)
+      const shoeBoxesForCamera = shoes.map(metrics)
+      const redUpperClothingScore = redBoxesForCamera.filter((box) =>
+        box.top <= 24 && box.boxHeight >= 18 && box.centerY <= 58,
+      ).length
+      const verticalLegScore = bodyBoxesForCamera.filter((box, index) => {
+        const axis = axisForComponent(masks.blue, bodyCandidates[index])
+        const tallLegShape = box.boxHeight >= box.boxWidth * 1.25 && box.boxHeight >= 24
+        const mostlyVerticalAxis = axis ? /upper|lower/.test(axis.direction) && !/left|right/.test(axis.direction) : false
+        return tallLegShape || mostlyVerticalAxis
+      }).length
+      const sideProfileShoeScore = shoeBoxesForCamera.filter((box, index) => {
+        const axis = shoeAxes[index]
+        const wideSideShape = box.boxWidth >= box.boxHeight * 1.15
+        const sideToeDirection = axis ? /left|right/.test(axis.toeDirection) && !/upper|lower/.test(axis.toeDirection) : false
+        return wideSideShape || sideToeDirection
+      }).length
+      const lowShoeScore = shoeBoxesForCamera.filter((box) => box.centerY >= 54).length
+      const diagonalTopDownShoeScore = shoeAxes.filter((axis) => axis && /upper-|lower-/.test(axis.toeDirection)).length
+      const noUpperClothingTopDownScore = clothes.length === 0 ? 2 : 0
+      const handLowTopDownScore = greenHandCandidates.some((component) => metrics(component).centerY >= 62) ? 1 : 0
+      const sideCameraScore = redUpperClothingScore * 2 + verticalLegScore * 2 + sideProfileShoeScore + (lowShoeScore >= Math.max(1, Math.ceil(shoes.length / 2)) ? 1 : 0)
+      const topDownCameraScore = noUpperClothingTopDownScore + diagonalTopDownShoeScore + handLowTopDownScore
+      const handAngleCameraView = sideCameraScore >= 3 && sideCameraScore > topDownCameraScore
+        ? 'eye-level / side-view fashion footwear shot'
+        : 'first-person downward / top-down POV'
+      const isHandAngleSideView = handAngleCameraView.startsWith('eye-level')
+      const handAngleCameraReason = isHandAngleSideView
+        ? `sideViewScore=${sideCameraScore}, topDownScore=${topDownCameraScore}: upper red clothing and/or tall vertical blue leg shapes with side-profile shoes indicate a平视/侧面镜头.`
+        : `topDownScore=${topDownCameraScore}, sideViewScore=${sideCameraScore}: shoes/feet/hands read as seen from above or without strong vertical standing-body cues, so use俯视/第一视角.`
+      const shoeNaturalPoseLines = shoes.map((component, index) => {
+        const box = metrics(component)
+        const axis = shoeAxes[index]
+        const roleInfo = shoeRoleInfos[index]
+        const roleText = roleInfo.role === 'foot'
+          ? 'worn on the single visible foot/ankle'
+          : roleInfo.role === 'hand'
+            ? 'bare display shoe naturally held or supported by the hand'
+            : 'bare standalone display shoe'
+        return `S${index + 1}: place a realistic product shoe in the ${handPlacementName(box.centerX, box.centerY)} area, ${roleText}, with shoe toe/front pointing ${axis?.toeDirection || 'as marked by code'} and heel opposite. Keep the shoe integrated into a natural ${handAngleCameraView} photo; do not make it look pasted, stiff, oversized, floating, or reversed.`
       })
       const bodyLines = bodyCandidates.map((component, index) => {
         const box = metrics(component)
         const axis = axisForComponent(masks.blue, component)
-        const touchingShoes = touchIndexes(component, shoes, 0.08).map((shoeIndex) => `S${shoeIndex + 1}`)
+        const touchingShoes = shoes
+          .map((_, shoeIndex) => ({ shoeIndex, roleInfo: shoeRoleInfos[shoeIndex] }))
+          .filter(({ roleInfo }) => roleInfo.role === 'foot' && roleInfo.touchingBlue.includes(index))
+          .map(({ shoeIndex }) => `S${shoeIndex + 1}`)
         const touchingRed = touchIndexes(component, clothes, 0.08).map((redIndex) => `R${redIndex + 1}`)
         const classification = blueClassifications[index]
-        return `B${index + 1}: ${classification?.kind || 'FOOT/LEG'} by code, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingShoes=${touchingShoes.length ? touchingShoes.join('/') : 'none'}, touchingClothing=${touchingRed.length ? touchingRed.join('/') : 'none'}, classificationReason=${classification?.reason || 'none'}. Generate this B region as leg/foot/ankle only; never generate it as hand, fingers, or wrist.`
+        return `B${index + 1}: ${classification?.kind || 'FOOT/LEG'} by code, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingShoes=${touchingShoes.length ? touchingShoes.join('/') : 'none'}, touchingClothing=${touchingRed.length ? touchingRed.join('/') : 'none'}, classificationReason=${classification?.reason || 'none'}. Generate this B region as leg/foot/ankle only; never generate it as hand, fingers, or wrist.${touchingShoes.length ? '' : ' Because touchingShoes=none, this B region is detached from all product shoes: it must not enter, wear, touch, or visually connect to any S shoe; keep it secondary/cropped as partial lower-leg/foot posture only.'}`
       })
       const greenHandLines = greenHandCandidates.map((component, index) => {
         const box = metrics(component)
         const axis = axisForComponent(masks.green, component)
-        const touchingShoes = touchIndexes(component, shoes, 0.08).map((shoeIndex) => `S${shoeIndex + 1}`)
+        const touchingShoes = shoes
+          .map((_, shoeIndex) => ({ shoeIndex, roleInfo: shoeRoleInfos[shoeIndex] }))
+          .filter(({ roleInfo }) => roleInfo.role === 'hand' && roleInfo.touchingGreen.includes(index))
+          .map(({ shoeIndex }) => `S${shoeIndex + 1}`)
         const touchingRed = touchIndexes(component, clothes, 0.08).map((redIndex) => `R${redIndex + 1}`)
         const classification = greenClassifications[index]
         return `G${index + 1}: HAND by explicit green region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), axis ${axis ? `(${axis.start.x}%,${axis.start.y}%)->(${axis.end.x}%,${axis.end.y}%), direction ${axis.direction}` : 'unknown'}, touchingShoes=${touchingShoes.length ? touchingShoes.join('/') : 'none'}, touchingClothing=${touchingRed.length ? touchingRed.join('/') : 'none'}, classificationReason=${classification.reason}. Generate this G region as hand/fingers/wrist only; never generate it as leg, foot, or ankle.`
       })
       const clothingLines = clothes.map((component, index) => {
         const box = metrics(component)
-        return `R${index + 1}: clothing/red region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%). Red controls only lower-body clothing support from model reference.`
+        return `R${index + 1}: clothing/red region, bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%). Red controls only clothing placement/crop/occlusion. Clothing appearance must come from the uploaded model reference: outfit category, color, fabric, drape, silhouette, hem/waistband/sleeve edge, folds, and styling. Do not turn the red mask color or red block shape into clothing color/design; do not invent a different outfit.`
       })
+      const ignoredYellowFragmentLines = ignoredYellowDetailFragments.map((component, index) => {
+        const box = metrics(component)
+        const nearest = shoes
+          .map((shoe, shoeIndex) => {
+            const shoeBox = metrics(shoe)
+            return {
+              shoeIndex,
+              distance: Math.hypot(box.centerX - shoeBox.centerX, box.centerY - shoeBox.centerY),
+            }
+          })
+          .sort((a, b) => a.distance - b.distance)[0]
+        const target = nearest ? `S${nearest.shoeIndex + 1}` : 'nearest main shoe'
+        return `ignored yellow detail fragment ${index + 1}: bbox left ${box.left}%, top ${box.top}%, width ${box.boxWidth}%, height ${box.boxHeight}%, center (${box.centerX}%,${box.centerY}%), merged into ${target} as heel/edge/buckle/strap/detail fragment; never generate it as a separate shoe.`
+      })
+      const wornShoeIndexes = shoeRoleInfos
+        .map((roleInfo, index) => roleInfo.role === 'foot' ? `S${index + 1}` : '')
+        .filter(Boolean)
+      const handSupportedShoeIndexes = shoeRoleInfos
+        .map((roleInfo, index) => roleInfo.role === 'hand' ? `S${index + 1}` : '')
+        .filter(Boolean)
+      const displayOnlyShoeIndexes = shoeRoleInfos
+        .map((roleInfo, index) => roleInfo.role === 'display' ? `S${index + 1}` : '')
+        .filter(Boolean)
+      const blueFootLegCount = blueClassifications.filter((item) => item.kind === 'FOOT/LEG').length
+      const roughPoseParts = [
+        wornShoeIndexes.length
+          ? `${wornShoeIndexes.join(', ')} = product shoe worn on the visible blue/B foot-leg region`
+          : 'no product shoe is worn on a visible blue/B foot-leg region',
+        handSupportedShoeIndexes.length
+          ? `${handSupportedShoeIndexes.join(', ')} = bare display shoe held or supported by the green/G hand`
+          : '',
+        displayOnlyShoeIndexes.length
+          ? `${displayOnlyShoeIndexes.join(', ')} = bare standalone display shoe`
+          : '',
+        blueFootLegCount === 1 ? 'there is one visible lower leg/foot gesture, not a two-foot standing pose' : '',
+        `cameraViewByCode = ${handAngleCameraView}`,
+        greenHandCandidates.length ? 'the visible hand/arm gesture should follow the green/G hand reaching to the shoe' : '',
+        clothes.length ? 'red/R clothing areas only indicate cropped lower garment placement and must not add extra feet or legs' : '',
+      ].filter(Boolean)
       const layout = [
         'HAND ANGLE CONTROL HARD CONSTRAINT:',
         'This is the dedicated code-generated control for the upload channel "angle reference with hands". It does not use the normal angle-reference code logic or normal angle-reference prompt.',
         'Color meaning: yellow/S = product shoe placement/angle/scale/occlusion; green/G = explicit hand/wrist/finger region; blue/B = leg/foot/ankle region only; red/R = clothing support; black/empty = background.',
+        'AI VISUAL POSE RECOGNITION REFERENCE: before generating, visually inspect the original uploaded hand-angle reference image to understand the rough human action, body gesture, hand-to-shoe relationship, leg direction, clothing crop, and camera feeling. Use this only as a rough pose/action reference; the code S/B/G/R map remains the hard count, role, coordinate, and shoe-direction authority.',
+        `HAND ANGLE CAMERA VIEW BY CODE: cameraView=${handAngleCameraView}; reason=${handAngleCameraReason} Use this camera view as a hard camera selection for this hand-angle upload. Do not force every hand-angle reference into a top-down view.`,
+        isHandAngleSideView
+          ? 'HAND ANGLE EYE-LEVEL SIDE-VIEW CAMERA LOCK: this hand-angle reference is a平视/侧面女鞋展示镜头. Generate a natural eye-level or slightly low side-view footwear photo with visible side-profile legs/shoes and garment crop. Do not convert it into first-person top-down, overhead flat-lay, or looking-down-at-floor perspective.'
+          : 'HAND ANGLE FIRST-PERSON DOWNWARD CAMERA LOCK: this hand-angle reference is a俯视/第一视角往下拍镜头. The camera is above the wearer/model looking down at the shoes, hand, foot/ankle, clothing edge, and floor plane. Show top surfaces and ground-plane placement, not an eye-level side product shot.',
+        !isHandAngleSideView ? 'HAND ANGLE TOP-DOWN GROUND-PLANE LOCK: under this first-person downward hand-angle view, every S shoe, visible B foot/ankle, G hand, and R clothing crop must stay on the same downward-view canvas perspective and keep the code S/B/G/R coordinates. Do not rotate the whole scene into a horizontal side profile; do not move display shoes away from their floor-plane relationship; preserve each S cyan-to-magenta toe/heel direction inside the top-down view.' : '',
+        shoeNaturalPoseLines.length ? 'HAND ANGLE NATURAL PHOTO POSE SUMMARY BY CODE:\nUse this short natural-language pose summary before reading numeric locks. It is generated from the current uploaded hand-angle reference only and must adapt to each different reference image.\n' + shoeNaturalPoseLines.join('\n') + `\nGenerate a natural ${handAngleCameraView} commercial photo: hand, foot/ankle, shoe scale, ground contact, shadows, and perspective should feel photographic and relaxed, while still preserving each S shoe toe/front direction, role, and cameraViewByCode.` : '',
+        roughPoseParts.length ? `CODE ROUGH POSE DESCRIPTION: ${roughPoseParts.join('; ')}.` : '',
+        'ORIGINAL HAND-ANGLE VISUAL POSE RULE: the final photo should feel like the original hand-angle reference action, but it must not copy the mask colors, block shapes, shoe design, background, or any extra body parts not listed by the code map.',
+        'HAND ANGLE MASK COLOR BAN: yellow, green, blue, red, black, gray, cyan TOE markers, magenta HEEL markers, red direction arrows, orange buckle markers, white labels, grid lines, guide boxes, and all control-map colors are invisible metadata only. The final image must not show yellow shoes from the mask, green hands, blue legs/feet, red clothing blocks, cyan/magenta shoe-end markers, red guide arrows, orange buckle guide rings, black mask background, gray guide fills, tinted stains, colored reflections, colored outlines, or any flat color-block residue.',
+        'TOE/HEEL MARKER RULE: in this hand-angle control only, cyan circular marker = shoe toe/front endpoint, magenta circular marker = shoe heel endpoint, red arrow = heel-to-toe direction along the actual yellow shoe long axis. These colored markers locate the product shoe direction and must guide rotation; they must never appear in the final generated photo.',
+        'BUCKLE/CLASP MARKER RULE: in this hand-angle control only, orange ring marker = intended buckle/clasp/ring/strap-fastener side position. If the uploaded product shoe has visible buckles, clasps, rings, strap fasteners, buckle holes, or strap anchor points, place them near the orange marker on each shoe. If there are exactly two visible product shoes, the orange markers indicate a real left/right pair with hardware on opposite outer sides; do not put both buckles on the same side. If the uploaded product shoe has no buckle/clasp hardware, ignore the orange marker.',
+        buckleSideLines.length ? 'BUCKLE SIDE HARD LOCK BY CODE:\n' + buckleSideLines.join('\n') + '\nIf two S shoes are visible, these buckleSide values must be opposite outer sides. A result with both buckles/clasps/rings on the same canvas side or same shoe side fails.' : '',
         'Coordinate hard-lock: treat this hand-angle control as a fixed X0-X100 / Y0-Y100 canvas. Every S/B/G/R bbox left/top/width/height/center is mandatory. Do not recenter, rebalance, beautify, flip, straighten, or move objects into a generic commercial pose. The original uploaded angle image and aesthetic wording only verify the layout; they must not override the numeric S/B/G/R coordinates.',
         'Green/blue rule for this hand-angle channel: every green/G region is HAND and every blue/B region is FOOT/LEG. Follow these fixed color roles exactly; do not reinterpret green as leg or blue as hand.',
-        'Hand-supported shoe rule: a yellow shoe touched by a green/G hand candidate may be handheld or hand-supported display shoe; it must not automatically become worn-on-foot. A yellow shoe worn by blue foot/ankle/lower-leg candidate becomes worn shoe.',
+        'Main-shoe counting rule: count only main yellow shoe-shaped regions as S product shoes. Small disconnected yellow heel caps, straps, buckles, shoe-edge pieces, stitching/detail islands, and yellow slivers are merged into the nearest main S shoe and must never become separate product shoes. Each connected blue/B region is one foot/leg region. Each connected green/G region is one hand/wrist/finger region.',
+        'Resolved contact role rule: use the final role written in SHOE/YELLOW MAP as authoritative. If an S line says WORN_ON_FOOT, only then generate it as worn on the blue/B foot. If an S line says HAND_HELD_OR_HAND_SUPPORTED_DISPLAY, generate it as a bare display shoe held/supported by green/G hand even if the original mask edges are close to blue/B; do not attach a foot, ankle, leg, or toes to it. If an S line says DISPLAY_ONLY, keep it as a bare standalone display shoe.',
+        'HAND ANGLE CONTROL SHOE DIRECTION LOCK: for every S/yellow shoe, preserve its bbox, cyan TOE marker, magenta HEEL marker, red heel-to-toe arrow, heel-to-toe shoeAxis, toe/front coordinate, heel coordinate, and toeDirection exactly. The cyan/magenta endpoints are placed on the actual yellow shoe long axis, not on an abstract bbox centerline. Rotate the uploaded product shoe from magenta HEEL toward cyan TOE to match each S toeDirection; do not use the product image original direction if it conflicts with the S/yellow direction. If one S is worn on a blue/B foot and another S is display or hand-supported, align the display/hand-supported S with the worn shoe while keeping its TOE/HEEL markers on that shoe own yellow long axis. Left/right shoe pairing must not reverse or change the S toeDirection.',
+        shoeDirectionHardLockLines.length ? 'HAND ANGLE PER-SHOE FINAL DIRECTION LOCK BY CODE:\n' + shoeDirectionHardLockLines.join('\n') : '',
+        'HAND ANGLE SHOE COUNT LOCK: mainShoeObjectCount equals the number of main yellow/S shoe-shaped regions after small yellow detail fragments are merged into the nearest main shoe. Generate exactly one product shoe for each main S/yellow shoe object. Do not split a large yellow region into multiple shoes. Do not generate ignored yellow detail fragments as extra shoes.',
+        shoes.length === 2 ? 'HAND ANGLE TWO-SHOE PAIR LOCK: mainShoeObjectCount=2 means the two visible product shoes must be one real left-shoe/right-shoe pair, not two copies of the same side. Buckles, clasps, rings, strap fasteners, buckle holes, strap anchor points, and side seams must show a mirrored left/right relationship. The buckles/clasps/rings must follow each S orange buckle marker and must not appear on the same canvas side or the same shoe side on both shoes. Keep each S shoe toeDirection from the yellow layout; do not reverse a toe/front direction to create the pair.' : '',
         `mainShoeObjectCount = ${shoes.length}`,
+        `rawYellowFragmentCount = ${rawYellowComponents.length}`,
+        `splitYellowObjectCount = ${shoes.length}`,
+        `ignoredHeelOrDetailFragmentCount = ${ignoredYellowDetailFragments.length}`,
+        ignoredYellowFragmentLines.length ? 'IGNORED YELLOW DETAIL FRAGMENTS:\n' + ignoredYellowFragmentLines.join('\n') : '',
+        'handAngleShoeSplitLogic = main-shoe-only-with-small-fragment-merge',
         `greenHandCount = ${greenHandCandidates.length}`,
         'blueHandCount = 0',
-        `blueFootLegCount = ${blueClassifications.filter((item) => item.kind === 'FOOT/LEG').length}`,
+        `blueLegFootRegionCount = ${blueClassifications.filter((item) => item.kind === 'FOOT/LEG').length}`,
+        `blueFootLegCount = ${blueFootLegCount}`,
+        `wornShoes = ${wornShoeIndexes.length ? wornShoeIndexes.join(', ') : 'none'}`,
+        `handheldOrHandSupportedShoes = ${handSupportedShoeIndexes.length ? handSupportedShoeIndexes.join(', ') : 'none'}`,
+        `standaloneDisplayShoes = ${displayOnlyShoeIndexes.length ? displayOnlyShoeIndexes.join(', ') : 'none'}`,
+        wornShoeIndexes.length === 0 ? 'HAND ANGLE NO WORN SHOE LOCK: wornShoes=none means no product shoe is worn by any foot. Every S shoe must remain a bare display shoe. Do not insert foot, sock, toes, ankle, leg, or skin into any S shoe, and do not create a try-on or wearing action.' : '',
+        wornShoeIndexes.length === 0 && handSupportedShoeIndexes.length ? `HAND ANGLE HAND-DISPLAY SHOE LOCK: ${handSupportedShoeIndexes.join(', ')} are bare display product shoes held or supported by green/G hand regions only. The final image should read as hands holding/supporting display shoes, not feet wearing shoes.` : '',
+        shoes.length === 2 && wornShoeIndexes.length === 1 ? `HAND ANGLE TWO-SHOE ROLE LOCK: final image must contain exactly 2 product shoes total. ${wornShoeIndexes[0]} is the only shoe worn on a visible foot/leg. ${handSupportedShoeIndexes.length ? `${handSupportedShoeIndexes.join(', ')} must remain bare hand-held or hand-supported display shoe(s), with no foot, ankle, leg, toes, or sock inside.` : ''} Do not create any third shoe, second worn shoe, second foot wearing a shoe, or extra product shoe outside the S1/S2 layout.` : '',
+        blueFootLegCount === 1 ? 'HAND ANGLE SINGLE BLUE FOOT LOCK: blueFootLegCount=1 means generate exactly one visible foot/leg/ankle region only. Do not generate a second foot, second leg, second ankle, second sock, second toes, or another lower-body limb outside B1. The model reference may control clothing fabric/style only and must not introduce an extra leg/foot/shoe.' : '',
+        blueFootLegCount === 1 && wornShoeIndexes.length === 0 ? 'HAND ANGLE DETACHED BLUE FOOT LOCK: because wornShoes=none, the single blue/B foot-leg region is not a wearing foot. If visible, it may appear only as a secondary cropped lower-leg/sock/foot posture from the reference; it must not overlap, enter, touch, or wear any product shoe.' : '',
+        `rawBluePixelCount = ${rawBluePixelCount}`,
+        `handAngleNoBlueRegion = ${handAngleNoBlueRegion ? 'true' : 'false'}`,
+        `handAngleNoValidBlueFootLeg = ${handAngleNoValidBlueFootLeg ? 'true' : 'false'}`,
         `redClothingRegionCount = ${clothes.length}`,
+        handAngleNoBlueRegion ? 'No blue/B leg-foot color is detected in this hand-angle control. Do not generate any foot, ankle, leg, toes, skin limb, worn foot, or lower body. All yellow/S shoes must be bare display shoes or green/G hand-supported shoes only.' : '',
+        handAngleNoValidBlueFootLeg ? 'No valid blue/B leg-foot component is detected in this hand-angle control. Even if red/R clothing exists, red/R may only become cropped clothing fabric and must not introduce legs, feet, ankles, toes, skin limbs, a worn foot, or lower body. All yellow/S shoes are bare display shoes or green/G hand-supported shoes only.' : '',
         clothes.length === 0 ? 'No red/R clothing region is detected in this hand-angle control. Do not generate clothing, garment, skirt hem, pants hem, sleeve, fabric panel, torso, or outfit area. Show only the shoes, green/G hands if present, and blue/B feet/legs required by the S/B/G layout.' : '',
         shoeLines.length ? 'SHOE/YELLOW MAP:\n' + shoeLines.join('\n') : 'SHOE/YELLOW MAP: none detected.',
         bodyLines.length ? 'BLUE LEG/FOOT MAP:\n' + bodyLines.join('\n') : 'BLUE LEG/FOOT MAP: none detected.',
         greenHandLines.length ? 'GREEN HAND MAP:\n' + greenHandLines.join('\n') : 'GREEN HAND MAP: none detected.',
         clothingLines.length ? 'RED CLOTHING MAP:\n' + clothingLines.join('\n') : 'RED CLOTHING MAP: none detected.',
-        'Final image must not show labels, grid, gray guide fills, white boxes, or yellow/green/blue/red/black mask colors. Replace every region with realistic photographic content from the assigned references.',
+        'Final image must not show labels, grid, gray guide fills, white boxes, colored outlines, tinted remnants, or yellow/green/blue/red/black mask colors. Replace every region with realistic photographic content from the assigned references: yellow/S becomes the uploaded product shoe, green/G becomes natural skin hands/fingers/wrists, blue/B becomes natural skin legs/feet/ankles only when present, red/R becomes real clothing fabric from the model reference, and black/empty becomes the uploaded background.',
       ].join('\n')
       return { file: controlFile, layout }
     } catch {
@@ -4566,6 +5748,165 @@ function App() {
     return new Promise<Blob | null>((resolve) => {
       canvas.toBlob(resolve, type, quality)
     })
+  }
+
+  async function buildHandAngleProductShoePrelayout(productFile: File, angleFile: File, angleLayout: string) {
+    const layoutText = String(angleLayout || '')
+    const expectedShoeCount = Number(/mainShoeObjectCount\s*=\s*(\d+)/i.exec(layoutText)?.[1] || '')
+    const shoeMatches = Array.from(layoutText.matchAll(/S(\d+): shoe\/yellow region,[^\n]*?role=(.*?), bbox left ([\d.]+)%, top ([\d.]+)%, width ([\d.]+)%, height ([\d.]+)%, center \(([\d.]+)%,([\d.]+)%\), shoeAxis heel \(([\d.]+)%,([\d.]+)%\)->toe\/front \(([\d.]+)%,([\d.]+)%\), toeDirection ([^,\n]+)/gi))
+      .map((match) => ({
+        id: `S${match[1]}`,
+        role: match[2],
+        left: Number(match[3]),
+        top: Number(match[4]),
+        boxWidth: Number(match[5]),
+        boxHeight: Number(match[6]),
+        centerX: Number(match[7]),
+        centerY: Number(match[8]),
+        heelX: Number(match[9]),
+        heelY: Number(match[10]),
+        toeX: Number(match[11]),
+        toeY: Number(match[12]),
+        toeDirection: match[13],
+      }))
+      .filter((item) => [item.left, item.top, item.boxWidth, item.boxHeight, item.centerX, item.centerY, item.heelX, item.heelY, item.toeX, item.toeY].every(Number.isFinite))
+    if (!shoeMatches.length) return null
+    if (Number.isFinite(expectedShoeCount) && expectedShoeCount > 0 && shoeMatches.length !== expectedShoeCount) return null
+    const shouldSkipComplexHandAnglePrelayout = () => {
+      if (shoeMatches.length < 2) return false
+      const lineIntersects = (
+        a: { x: number; y: number },
+        b: { x: number; y: number },
+        c: { x: number; y: number },
+        d: { x: number; y: number },
+      ) => {
+        const cross = (p: { x: number; y: number }, q: { x: number; y: number }, r: { x: number; y: number }) =>
+          (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)
+        const abC = cross(a, b, c)
+        const abD = cross(a, b, d)
+        const cdA = cross(c, d, a)
+        const cdB = cross(c, d, b)
+        return abC * abD < 0 && cdA * cdB < 0
+      }
+      for (let firstIndex = 0; firstIndex < shoeMatches.length; firstIndex += 1) {
+        for (let secondIndex = firstIndex + 1; secondIndex < shoeMatches.length; secondIndex += 1) {
+          const first = shoeMatches[firstIndex]
+          const second = shoeMatches[secondIndex]
+          const overlapLeft = Math.max(first.left, second.left)
+          const overlapTop = Math.max(first.top, second.top)
+          const overlapRight = Math.min(first.left + first.boxWidth, second.left + second.boxWidth)
+          const overlapBottom = Math.min(first.top + first.boxHeight, second.top + second.boxHeight)
+          const overlapArea = Math.max(0, overlapRight - overlapLeft) * Math.max(0, overlapBottom - overlapTop)
+          const firstArea = Math.max(1, first.boxWidth * first.boxHeight)
+          const secondArea = Math.max(1, second.boxWidth * second.boxHeight)
+          const overlapRatio = overlapArea / Math.min(firstArea, secondArea)
+          const centerDistance = Math.hypot(first.centerX - second.centerX, first.centerY - second.centerY)
+          const firstDiagonal = Math.hypot(first.boxWidth, first.boxHeight)
+          const secondDiagonal = Math.hypot(second.boxWidth, second.boxHeight)
+          const closeStackedShoes = centerDistance < Math.min(firstDiagonal, secondDiagonal) * 0.42
+          const crossingAxes = lineIntersects(
+            { x: first.heelX, y: first.heelY },
+            { x: first.toeX, y: first.toeY },
+            { x: second.heelX, y: second.heelY },
+            { x: second.toeX, y: second.toeY },
+          )
+          if (overlapRatio >= 0.12 || closeStackedShoes || crossingAxes) return true
+        }
+      }
+      return false
+    }
+    if (shouldSkipComplexHandAnglePrelayout()) return null
+    try {
+      const angleSize = await getImageNaturalSize(angleFile)
+      const maxSide = 1024
+      const scale = Math.min(1, maxSide / Math.max(angleSize.width, angleSize.height))
+      const width = Math.max(320, Math.round(angleSize.width * scale))
+      const height = Math.max(320, Math.round(angleSize.height * scale))
+      const productBitmap = await createImageBitmap(productFile)
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        productBitmap.close?.()
+        return null
+      }
+      const drawPrelayoutLabel = (text: string, x: number, y: number) => {
+        const padding = Math.max(4, Math.round(width * 0.008))
+        const metrics = ctx.measureText(text)
+        const fontMatch = /(\d+(?:\.\d+)?)px/.exec(ctx.font)
+        const fontSize = fontMatch ? Number(fontMatch[1]) : Math.max(12, Math.round(width * 0.02))
+        const safeX = Math.max(padding, Math.min(x, width - metrics.width - padding))
+        const safeY = Math.max(padding, Math.min(y, height - fontSize - padding))
+        ctx.fillText(text, safeX, safeY)
+      }
+      ctx.fillStyle = '#fbfaf7'
+      ctx.fillRect(0, 0, width, height)
+      ctx.strokeStyle = 'rgba(30,30,30,0.14)'
+      ctx.lineWidth = Math.max(1, Math.round(Math.max(width, height) * 0.0018))
+      ;[0, 25, 50, 75, 100].forEach((value) => {
+        const x = Math.round((value / 100) * width)
+        const y = Math.round((value / 100) * height)
+        ctx.beginPath()
+        ctx.moveTo(x, 0)
+        ctx.lineTo(x, height)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(0, y)
+        ctx.lineTo(width, y)
+        ctx.stroke()
+      })
+      shoeMatches.forEach((shoe) => {
+        const centerX = (shoe.centerX / 100) * width
+        const centerY = (shoe.centerY / 100) * height
+        const boxW = Math.max(24, (shoe.boxWidth / 100) * width)
+        const boxH = Math.max(24, (shoe.boxHeight / 100) * height)
+        const heelX = (shoe.heelX / 100) * width
+        const heelY = (shoe.heelY / 100) * height
+        const toeX = (shoe.toeX / 100) * width
+        const toeY = (shoe.toeY / 100) * height
+        const axisAngle = Math.atan2(toeY - heelY, toeX - heelX)
+        const targetLongSide = Math.max(boxW, boxH) * 0.96
+        const productLongSide = Math.max(productBitmap.width, productBitmap.height)
+        const productScale = targetLongSide / Math.max(1, productLongSide)
+        const drawW = productBitmap.width * productScale
+        const drawH = productBitmap.height * productScale
+        const productAngle = productBitmap.width >= productBitmap.height ? 0 : Math.PI / 2
+        ctx.save()
+        ctx.translate(centerX, centerY)
+        ctx.rotate(axisAngle - productAngle)
+        ctx.globalAlpha = 0.9
+        ctx.drawImage(productBitmap, -drawW / 2, -drawH / 2, drawW, drawH)
+        ctx.globalAlpha = 1
+        ctx.strokeStyle = 'rgba(255,79,95,0.9)'
+        ctx.lineWidth = Math.max(3, Math.round(Math.max(width, height) * 0.004))
+        ctx.beginPath()
+        ctx.moveTo(-targetLongSide * 0.34, 0)
+        ctx.lineTo(targetLongSide * 0.34, 0)
+        ctx.stroke()
+        ctx.restore()
+        ctx.fillStyle = '#00e5ff'
+        ctx.beginPath()
+        ctx.arc(toeX, toeY, Math.max(7, Math.round(width * 0.014)), 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = '#ff4fd8'
+        ctx.beginPath()
+        ctx.arc(heelX, heelY, Math.max(7, Math.round(width * 0.014)), 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = '#111111'
+        ctx.font = `bold ${Math.max(12, Math.round(width * 0.02))}px Arial`
+        drawPrelayoutLabel(`${shoe.id} PRODUCT PRELAYOUT TOE ${shoe.toeDirection}`, toeX + 8, toeY + 8)
+        drawPrelayoutLabel(`${shoe.id} HEEL`, heelX + 8, heelY + 8)
+        drawPrelayoutLabel(`${shoe.id} ${shoe.role}`, (shoe.left / 100) * width + 6, (shoe.top / 100) * height + 6)
+      })
+      productBitmap.close?.()
+      const blob = await canvasToBlob(canvas, 'image/png')
+      if (!blob) return null
+      const baseName = angleFile.name.replace(/\.[^.]+$/, '') || 'hand-angle'
+      return new File([blob], `${baseName}-shoe-prelayout.png`, { type: 'image/png' })
+    } catch {
+      return null
+    }
   }
 
   async function compressMergeReferenceFile(file: File, role: MergeImageSlot['id']) {
@@ -4652,11 +5993,6 @@ function App() {
         source: 'hand' as const,
         label: (mergeImageFiles.angleHand || []).length > 1 ? `角度参考图（含手） ${index + 1}` : '角度参考图（含手）',
       })),
-      ...(mergeImageFiles.angleSingle || []).map((file, index) => ({
-        file,
-        source: 'single' as const,
-        label: (mergeImageFiles.angleSingle || []).length > 1 ? `角度参考图（单脚） ${index + 1}` : '角度参考图（单脚）',
-      })),
     ].slice(0, mergeAngleBatchLimit)
     const modelFile = (mergeImageFiles.model || [])[0]
     const selectedLibraryAngles = selectedMergeAngleIds
@@ -4689,14 +6025,12 @@ function App() {
       label: string
       url: string
       uploadedFile: File | null
-      uploadedAngleKind?: 'standard' | 'hand' | 'single'
+      uploadedAngleKind?: 'standard' | 'hand'
     }> = uploadedAngleItems.length > 0
       ? uploadedAngleItems.map((item, index) => ({
           id: item.source === 'hand'
             ? `uploaded-angle-hand-${index + 1}`
-            : item.source === 'single'
-              ? `uploaded-angle-single-${index + 1}`
-              : `uploaded-angle-${index + 1}`,
+            : `uploaded-angle-${index + 1}`,
           label: item.label,
           url: '',
           uploadedFile: item.file,
@@ -4715,7 +6049,7 @@ function App() {
       for (const angleItem of generationAngles) {
         const angleFile = angleItem.uploadedFile || await fileFromAsset(angleItem.url, `${angleItem.id}.png`)
         const isHandAngleUpload = angleItem.uploadedFile && angleItem.uploadedAngleKind === 'hand'
-        const isSingleFootAngleUpload = angleItem.uploadedFile && angleItem.uploadedAngleKind === 'single'
+        const isSingleFootAngleUpload = false
         const useHandAngleControl = Boolean(isHandAngleUpload)
         const cleanedAngleControl = angleItem.uploadedFile
           ? useHandAngleControl
@@ -4728,11 +6062,15 @@ function App() {
         const angleLayoutBrief = angleItem.uploadedFile
           ? [cleanedAngleControl?.layout].filter(Boolean).join('\n\n')
           : await describeAngleColorBlocks(angleFile, `${angleItem.label} / ${angleItem.id}`)
+        const handAngleProductPrelayoutFile = useHandAngleControl && angleLayoutBrief
+          ? await buildHandAngleProductShoePrelayout(productFile, angleFile, angleLayoutBrief)
+          : null
         const uploadedAngleSmartAnalysis = ''
         const uploadedAnglePrompt = angleItem.uploadedFile
           ? buildUploadedAngleGenerationPrompt([
               uploadedAngleIsRealPhoto ? 'REAL PHOTO ANGLE REFERENCE' : '',
-              useHandAngleControl ? 'USER UPLOADED ANGLE REFERENCE WITH HANDS: use the dedicated hand-angle control image and hand-angle layout text for this channel. Yellow/S regions are shoes, green/G regions are explicit hands, blue/B regions are legs/feet/ankles only, red/R regions are clothing. Follow the S/B/G/R classifications exactly. A green/G HAND touching or holding a shoe makes that shoe hand-held or hand-supported, not automatically worn. A blue/B FOOT/LEG entering or wearing a shoe makes that shoe worn.' : '',
+              useHandAngleControl ? 'USER UPLOADED ANGLE REFERENCE WITH HANDS: use the dedicated hand-angle control image and hand-angle layout text for this channel. When the original uploaded hand-angle reference visually matches a shoes/feet/hands-from-above layout, treat it as a first-person downward/top-down POV camera: the viewer is above the model/wearer looking down at the floor plane, shoes, foot/ankle, hand, and clothing edge; do not convert it into eye-level, side-view, standing catalog, floating-foot, or side product perspective. Yellow/S regions are shoes, green/G regions are explicit hands, blue/B regions are legs/feet/ankles only, red/R regions are clothing. In the dedicated hand-angle control image, cyan circular markers identify each shoe toe/front endpoint, magenta circular markers identify each shoe heel endpoint, red arrows show the heel-to-toe direction along the actual yellow shoe long axis, and orange ring markers identify the intended buckle/clasp/ring/strap-fastener side position if the product shoe has such hardware; these markers are direction metadata only and must not appear in the final photo. Red/R only controls clothing position/crop/occlusion; the final clothing must follow the uploaded model reference image for outfit category, color, fabric, drape, silhouette, hem/waistband/sleeve edge, folds, and styling. The model reference must not change the code-detected number of feet, legs, worn shoes, or display shoes. Do not use the red mask color or red block shape as clothing design, and do not invent a different outfit. The final image must not contain any yellow, green, blue, red, cyan, magenta, orange, black, gray, label, grid, guide-box, outline, tint, stain, or flat color-block residue from the hand-angle reference or cleaned control image. Follow the S/B/G/R classifications exactly. Generate exactly the mainShoeObjectCount number of visible product shoes from the hand-angle layout; mainShoeObjectCount equals the main yellow/S shoe-shaped region count after small yellow heel/detail fragments are merged into the nearest main shoe, so ignored yellow detail fragments must not create extra shoes and standalone display shoes must not be omitted. If mainShoeObjectCount=2, generate exactly two product shoes total and do not add a third shoe. A green/G HAND touching or holding a shoe makes that shoe hand-held or hand-supported, not automatically worn. Only an S line explicitly marked WORN_ON_FOOT may become a worn shoe; if wornShoes=none, no foot, sock, toes, ankle, leg, or skin may enter any product shoe. A blue/B FOOT/LEG that does not touch an S shoe is detached body posture only and must not become a wearing foot. If blueFootLegCount=1, generate exactly one visible foot/leg/ankle region only and do not add a second foot, second leg, second ankle, second sock, second toes, or second worn shoe. Every S/yellow shoe must follow its code-generated magenta HEEL marker, cyan TOE marker, red heel-to-toe arrow, orange buckle/clasp side marker, heel coordinate, toe/front coordinate, heel-to-toe shoeAxis, and toeDirection; these endpoints must be understood as the shoe own long-axis endpoints, not an abstract bbox guide. If the uploaded product shoe has no buckle/clasp hardware, ignore orange markers. Do not split one main yellow/S shoe region into multiple shoes. If the hand-angle layout says handAngleNoBlueRegion=true or handAngleNoValidBlueFootLeg=true, do not generate any foot, ankle, leg, toes, worn foot, lower body, or skin limb; red/R clothing must not introduce legs or feet.' : '',
+              useHandAngleControl && !handAngleProductPrelayoutFile ? 'HAND-ANGLE COMPLEX SHOE LAYOUT NOTE: no product-shoe prelayout reference is provided for this upload because the code detected overlapping, stacked, crossed, or otherwise complex two-shoe geometry. Do not invent a pasted product-prelayout arrangement. Use image 1 cleaned control, image 2 original hand-angle reference, and the S/B/G/R layout text to preserve the two-shoe relationship, overlap, depth, and roles naturally.' : '',
               isSingleFootAngleUpload ? 'USER UPLOADED SINGLE-FOOT ANGLE REFERENCE: use the dedicated single-foot control addendum in the angle layout. If the code layout says footX1 / singleFootCodeCount = footX1, generate exactly one visible worn foot/leg only. Display shoes must stay bare product shoes with no foot, ankle, leg, sock, or skin inside. Follow the single-foot camera description by code: when first-person downward POV / top-down is detected, the camera must look down from above at the foot planted on the floor/ground plane, not an eye-level or side product view; when eye-level side-view is detected, keep that side-view camera. Do not invent a second worn foot to balance the image.' : '',
               uploadedAngleSmartAnalysis,
             ].filter(Boolean).join('\n'))
@@ -4743,11 +6081,17 @@ function App() {
             ? uploadedAnglePrompt
             : `Selected angle-library template: ${angleItem.label} (${angleItem.id}.png). This merge-angle image is the only pose/composition/semantic-mask template for this generation.`,
           angleItem.uploadedFile ? '' : mergeAnglePosePrompts[angleItem.id],
+          !angleItem.uploadedFile && angleItem.id === 'angle-19'
+            ? 'Selected pose prompt angle 17 toe-direction lock: the unworn display shoe toe/front must point in exactly the same canvas direction as the worn shoe toe/front. For angle 17, both shoe toes/fronts point toward the upper-left of the image and both heels point toward the lower-right. Do not rotate the display shoe toward another direction, do not point the display shoe downward, rightward, or opposite to the worn shoe, and do not use left/right pairing by reversing the display shoe toe direction.'
+            : '',
           angleItem.uploadedFile ? '' : mergeAngleAddedPosePrompts[angleItem.id],
+          !angleItem.uploadedFile && angleItem.id === 'angle-02'
+            ? 'Selected pose prompt angle 2 leg-action visual reference: an additional real leg-action reference image is uploaded for angle 2 only. Use this extra reference only to match the lower-leg pose, crossed-leg relationship, foot/ankle direction, first-person oblique camera feeling, close crop, and leg-to-shoe posture. Do not copy the reference image shoe design, shoe color, shoe material, buckle shape, black/transparent background, wall, floor, lighting, red clothing color, fabric, scene, or photographic style. The leg-action reference background must be ignored completely. Final shoe appearance still comes only from the uploaded product shoe image; final background/environment/wall/floor/light/shadow must come only from the uploaded background image; final outfit still comes only from the uploaded model reference when present.'
+            : '',
           modelFile ? 'A model reference image is uploaded. Use it only for outfit category/color/fabric, body-limb appearance, skin tone, lower-body proportion, and elegant styling as secondary support for the product shoes. Do not copy model shoes, model background, wall, floor, props, basket, flowers, watermark, or lighting pattern.' : 'No model reference image is uploaded. Generate simple natural body limbs/clothing only as required by the angle reference.',
           'Lower-body-only framing: never generate the model face, head, portrait, or full upper body. Keep the crop focused on shoes, feet, legs, hands if present in the angle mask, and only the clothing portion required around the lower body.',
           isHandAngleUpload
-            ? 'The dedicated hand-angle control image plus hand-angle layout text must dominate pose and camera: yellow/S controls shoe placement and role; green/G controls explicit hand/wrist/finger regions; blue/B controls leg/foot/ankle regions only; red/R controls clothing. Follow each S/B/G/R classification exactly and do not use the normal angle-reference code logic or normal angle-reference prompt rules for this hand-angle channel.'
+            ? 'The dedicated hand-angle control image plus hand-angle layout text must dominate pose and camera: yellow/S controls shoe placement, role, long axis, toe/front coordinate, heel coordinate, and toeDirection; green/G controls explicit hand/wrist/finger regions; blue/B controls leg/foot/ankle regions only; red/R controls clothing placement/crop/occlusion only. If the original hand-angle reference visually reads as first-person downward/top-down, preserve that camera exactly: look down from above at the floor plane and show the top surfaces/ground placement of shoes, foot/ankle, hand, and clothing edge; do not change it into eye-level, side-view, standing catalog, floating-foot, or side product view. The actual clothing must follow the uploaded model reference image for outfit category, color, fabric, drape, silhouette, hem/waistband/sleeve edge, folds, and styling, but the model reference must not change foot count, leg count, worn shoe count, display shoe count, or S/B/G/R roles. Generate exactly the mainShoeObjectCount number of visible product shoes and do not omit any S/yellow display shoe; only main yellow/S shoe-shaped regions become shoes in this hand-angle channel, while small yellow heel/edge/buckle/strap/detail fragments are merged into the nearest main shoe and must not create extra shoes. If mainShoeObjectCount=2, generate exactly two product shoes total as a true left/right product-shoe pair; do not copy the same-side shoe twice, do not place buckles/clasps/rings/strap fasteners on the same side on both shoes, and do not add a third shoe. If blueFootLegCount=1, generate exactly one visible foot/leg/ankle region only and do not add a second foot, second leg, second ankle, second sock, second toes, or second worn shoe. Follow each S/B/G/R classification exactly and do not use the normal angle-reference code logic or normal angle-reference prompt rules for this hand-angle channel. Never render the hand-angle mask colors: no yellow shoes from the mask, no green hands, no blue limbs, no red clothing blocks, no black mask background, no gray guide fills, no colored outlines or tinted residue. Rotate each uploaded product shoe to match the S/yellow toeDirection instead of using the product image original direction. In this hand-angle channel, do not run any shoe-splitting interpretation: a single main yellow/S shoe region remains one shoe even if it is large or partially covered by blue foot regions. When handAngleNoBlueRegion=true or handAngleNoValidBlueFootLeg=true, generate no feet, ankles, legs, toes, worn foot, lower body, or skin limb, even if red/R clothing exists.'
             : isSingleFootAngleUpload
             ? 'The single-foot angle control image plus code-generated structure analysis must dominate pose, camera, and shoe layout. Preserve the uploaded single-foot composition: when the code control marks footX1, generate only one visible worn foot/leg, and keep any other detected shoes as display shoes only. Do not add a second worn foot, do not convert display shoes into worn shoes, and keep the camera/crop focused on the product shoe. If the code says first-person downward POV / top-down, the camera must be above the wearer looking down at the foot planted on the floor/ground plane, with the display shoe lying on the same floor; never convert it to eye-level, side-view, front-view, floating-foot, or standing catalog camera. If the code says eye-level or low side-view, keep that side-view camera.'
             : uploadedAngleIsRealPhoto
@@ -4760,6 +6104,12 @@ function App() {
             : uploadedAngleIsRealPhoto
             ? 'The product shoe image must dominate shoe identity: replace the shoe identity in the real angle photo with the exact uploaded product shoe while preserving the real photo shoe placement, angle, size, toe direction, heel direction, perspective, worn/display role, hand/foot relationship, and occlusion. The final shoe must match the uploaded product shoe image 100%.'
             : 'The product shoe image must dominate shoe identity: redraw the exact uploaded product shoe according to the S/yellow placement and angle reference objects. Yellow/S objects only control shoe placement, angle, size, toe direction, heel position, perspective, and worn/display role; they never control shoe exterior appearance, silhouette, color, material, shape, style, sole, heel, toe, straps, buckles, laces, or details. The final shoe must match the uploaded product shoe image 100%.',
+          !angleItem.uploadedFile && angleItem.id === 'angle-19'
+            ? 'Selected pose prompt angle 17 final override: the worn foot enters from the lower-right and points to the upper-left. The visible ankle must be the inner-ankle side, not the outer-ankle side. The worn shoe visible side must be a no-buckle/no-clasp side like the reference image: do not place any buckle, ring, clasp, strap fastener, or metal hardware on the visible side of the worn shoe. The display shoe is unworn and placed left/lower-left of the worn shoe, and it may show buckle/clasp only on its own outside side. Keep exactly one visible worn foot/leg and one unworn display shoe. Both shoe toes must point upper-left and both heels lower-right. This angle-17 override has priority over generic angle-mask text and generic product-buckle preservation when deciding ankle side, buckle visibility, and display-shoe role.'
+            : '',
+          !angleItem.uploadedFile && angleItem.id === 'angle-19'
+            ? 'Selected pose prompt angle 17 foot-side visual reference: an additional real foot-side reference image is uploaded for angle 17 only. Use this extra reference only to match the worn foot/ankle side, the leg entering direction, and the worn shoe visible no-buckle/no-clasp side. Do not copy the shoe design, shoe color, shoe material, background, lighting, wall, floor, red guide box, or scene from this extra reference. Product shoe appearance still comes only from the uploaded product shoe image; background still comes only from the uploaded background image.'
+            : '',
           'The background image must dominate environment: use its wall, floor, baseboard, lighting direction, color temperature, and soft shadows. Do not use the model reference background.',
           userDemand ? 'Secondary user text demand, obey only when it does not conflict with the angle mask, model reference, product shoe lock, or background lock: ' + userDemand : '',
         ].filter(Boolean).join('\n')
@@ -4768,13 +6118,26 @@ function App() {
         generateForm.append('brief', effectiveBrief)
         generateForm.append('prompt', prompt)
         generateForm.append('size', outputSize)
-        generateForm.append('angleSource', angleItem.uploadedFile ? (uploadedAngleIsRealPhoto ? 'User uploaded real photo angle reference' : (angleItem.uploadedAngleKind === 'hand' ? 'User uploaded semantic color-block angle reference with hands' : angleItem.uploadedAngleKind === 'single' ? 'User uploaded semantic color-block single-foot angle reference' : 'User uploaded semantic color-block angle reference')) : `${angleItem.label} / ${angleItem.id}`)
+        generateForm.append('angleSource', angleItem.uploadedFile ? (uploadedAngleIsRealPhoto ? 'User uploaded real photo angle reference' : (angleItem.uploadedAngleKind === 'hand' ? 'User uploaded semantic color-block angle reference with hands' : 'User uploaded semantic color-block angle reference')) : `${angleItem.label} / ${angleItem.id}`)
         generateForm.append('angleLayout', angleLayoutBrief)
-        sharedFiles.forEach(({ image, name }) => generateForm.append('images', image, name))
+        sharedFiles.forEach(({ image, name }) => {
+          generateForm.append('images', image, name)
+        })
         if (cleanedAngleControl?.file) {
           generateForm.append('images', cleanedAngleControl.file, `merge-angle-control-${cleanedAngleControl.file.name}`)
         }
-        generateForm.append('images', await compressMergeReferenceFile(angleFile, 'angle'), `${angleItem.uploadedAngleKind === 'hand' ? 'merge-angle-hand' : angleItem.uploadedAngleKind === 'single' ? 'merge-angle-single' : 'merge-angle'}-${angleFile.name}`)
+        if (handAngleProductPrelayoutFile) {
+          generateForm.append('images', await compressMergeReferenceFile(handAngleProductPrelayoutFile, 'angle'), `merge-angle-hand-shoe-prelayout-${handAngleProductPrelayoutFile.name}`)
+        }
+        generateForm.append('images', await compressMergeReferenceFile(angleFile, 'angle'), `${angleItem.uploadedAngleKind === 'hand' ? 'merge-angle-hand' : 'merge-angle'}-${angleFile.name}`)
+        if (!angleItem.uploadedFile && angleItem.id === 'angle-19') {
+          const footSideReferenceFile = await fileFromAsset('/assets/merge-angle-library/angle-19-foot-side-reference.png', 'angle-19-foot-side-reference.png')
+          generateForm.append('images', await compressMergeReferenceFile(footSideReferenceFile, 'angle'), `merge-angle-foot-side-reference-${footSideReferenceFile.name}`)
+        }
+        if (!angleItem.uploadedFile && angleItem.id === 'angle-02') {
+          const legActionReferenceFile = await fileFromAsset('/assets/merge-angle-library/angle-02-leg-action-reference.png', 'angle-02-leg-action-reference.png')
+          generateForm.append('images', await compressMergeReferenceFile(legActionReferenceFile, 'angle'), `merge-angle-leg-action-reference-${legActionReferenceFile.name}`)
+        }
         const generateResponse = await fetch('/api/run/merge-image-generate', {
           method: 'POST',
           body: generateForm,
@@ -5921,10 +7284,12 @@ function App() {
       setLightboxStatus('已生成透明 PNG，可以直接下载。')
       setOperationStatus('透明 PNG 抠图已生成。')
       if (projectsOpen) {
-        const projectsResponse = await fetch('/api/projects')
-        const projectsData = await readJsonResponse(projectsResponse)
+        const projectsResponse = await fetch('/api/projects?limit=50&offset=0')
+        const projectsData = await readJsonResponse(projectsResponse) as { projects?: ProjectItem[]; hasMore?: boolean; nextOffset?: number }
         if (projectsResponse.ok) {
-          setProjects(Array.isArray(projectsData.projects) ? projectsData.projects as ProjectItem[] : [])
+          setProjects(Array.isArray(projectsData.projects) ? projectsData.projects : [])
+          setProjectsHasMore(Boolean(projectsData.hasMore))
+          setProjectsNextOffset(Number(projectsData.nextOffset || 0))
         }
       }
     } catch (cutoutError) {
@@ -7514,13 +8879,18 @@ function App() {
       <ProjectsPanel
         open={projectsOpen}
         loading={projectsLoading}
+        loadingMore={projectsLoadingMore}
+        hasMore={projectsHasMore}
         projects={projects}
         onClose={() => setProjectsOpen(false)}
         onRefresh={refreshProjectsPanel}
+        onLoadMore={loadMoreProjects}
         onOpenLightbox={openLightbox}
         onDownload={(imageUrl, title) => downloadImage(imageUrl, title)}
         onDownloadMany={downloadImages}
         onDeleteProjects={deleteProjects}
+        onReuseProjectReferences={reuseProjectMergeReferences}
+        onLoadProjectImagePrompt={loadProjectImagePrompt}
         onError={setError}
       />
 

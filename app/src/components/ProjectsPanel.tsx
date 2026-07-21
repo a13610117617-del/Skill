@@ -7,6 +7,7 @@ type ProjectImage = {
   prompt?: string
   compactPrompt?: string
   debugFinalPrompt?: string
+  hasPrompt?: boolean
   imageModel?: string
   size?: string
   directionId?: string
@@ -17,12 +18,21 @@ type ProjectImage = {
   favorite?: boolean
 }
 
+type UploadedFile = {
+  fileName: string
+  originalName: string
+  mimeType: string
+  size: number
+  url: string
+}
+
 type ProjectItem = {
   id: string
   skillDisplayName: string
   brief: string
   createdAt?: string
   updatedAt?: string
+  uploadedFiles?: UploadedFile[]
   images: ProjectImage[]
 }
 
@@ -30,6 +40,8 @@ type ProjectItem = {
 type ProjectsPanelProps = {
   open: boolean
   loading: boolean
+  loadingMore?: boolean
+  hasMore?: boolean
   projects: ProjectItem[]
   onClose: () => void
   onOpenLightbox: (imageUrl: string, title: string, items: Array<{ imageUrl: string; title: string; svgUrl?: string }>) => void
@@ -37,6 +49,9 @@ type ProjectsPanelProps = {
   onDownloadMany: (items: Array<{ imageUrl: string; title: string }>) => Promise<void>
   onDeleteProjects: (projectIds: string[]) => Promise<void>
   onRefresh: () => Promise<void>
+  onLoadMore?: () => Promise<void>
+  onReuseProjectReferences?: (project: ProjectItem) => Promise<void> | void
+  onLoadProjectImagePrompt?: (projectId: string, imageUrl: string) => Promise<string>
   onReuseImageSettings?: (project: ProjectItem, image: ProjectImage) => void
   onToggleFavorite?: (projectId: string, imageUrl: string, favorite: boolean) => Promise<void>
   onError: (message: string) => void
@@ -221,6 +236,10 @@ function getReferenceLabel(url: string, index: number) {
   try {
     const parsed = new URL(url, window.location.origin)
     const tag = parsed.searchParams.get('mergeRef') || ''
+    if (tag === 'angle-mask' || tag === 'original-angle-reference' || tag === 'real-photo-angle-reference') return '角度'
+    if (tag === 'background') return '背景'
+    if (tag === 'model-outfit-body-limbs') return '模特'
+    if (tag === 'product-shoe') return '产品'
     if (tag === 'angle-mask') return '角度'
     if (tag === 'background') return '背景'
     if (tag === 'model-outfit-body-limbs') return '模特'
@@ -231,19 +250,50 @@ function getReferenceLabel(url: string, index: number) {
   return `参考 ${index + 1}`
 }
 
+function shouldShowProjectReference(url: string) {
+  try {
+    const parsed = new URL(url, window.location.origin)
+    const tag = parsed.searchParams.get('mergeRef') || ''
+    return ['angle-mask', 'original-angle-reference', 'real-photo-angle-reference', 'background', 'model-outfit-body-limbs', 'product-shoe'].includes(tag)
+  } catch {
+    return false
+  }
+}
+
 function getReferenceLightboxItems(referenceImageUrls: string[]) {
-  return referenceImageUrls.map((referenceUrl, referenceIndex) => ({
-    imageUrl: referenceUrl,
-    title: getReferenceLabel(referenceUrl, referenceIndex),
-  }))
+  return referenceImageUrls
+    .filter(shouldShowProjectReference)
+    .map((referenceUrl, referenceIndex) => ({
+      imageUrl: referenceUrl,
+      title: getReferenceLabel(referenceUrl, referenceIndex),
+    }))
 }
 
 function getDisplayPrompt(image: ProjectImage) {
   return image.prompt || image.compactPrompt || image.debugFinalPrompt || ''
 }
 
+function hasReusableProjectReferences(project: ProjectItem) {
+  return (project.uploadedFiles || []).some((file) => {
+    const name = `${file.fileName || ''} ${file.originalName || ''}`.toLowerCase()
+    if (
+      name.includes('merge-angle-control-') ||
+      name.includes('merge-angle-hand-shoe-prelayout-') ||
+      name.includes('merge-angle-foot-side-reference-')
+    ) {
+      return false
+    }
+    return (
+      name.includes('merge-product-') ||
+      name.includes('merge-background-') ||
+      name.includes('merge-model-') ||
+      name.includes('merge-angle-')
+    )
+  })
+}
+
 export function ProjectsPanel(props: ProjectsPanelProps) {
-  const { open, loading, projects, onClose, onOpenLightbox, onDownload, onDownloadMany, onDeleteProjects, onRefresh, onReuseImageSettings, onToggleFavorite, onError } = props
+  const { open, loading, loadingMore = false, hasMore = false, projects, onClose, onOpenLightbox, onDownload, onDownloadMany, onDeleteProjects, onRefresh, onLoadMore, onReuseProjectReferences, onLoadProjectImagePrompt, onReuseImageSettings, onToggleFavorite, onError } = props
   const [selectionMode, setSelectionMode] = useState(false)
   const [deleteMode, setDeleteMode] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
@@ -265,6 +315,7 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
   const [imageTones, setImageTones] = useState<Record<string, ImageTone>>({})
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState | null>(null)
   const [expandedPrompt, setExpandedPrompt] = useState<{ title: string; prompt: string } | null>(null)
+  const [promptLoadingKey, setPromptLoadingKey] = useState('')
   const [deletingProjects, setDeletingProjects] = useState(false)
   const panelRef = useRef<HTMLElement | null>(null)
   const searchRef = useRef<HTMLDivElement | null>(null)
@@ -347,6 +398,27 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
     [allImages, selectedUrls],
   )
   const calendarDays = useMemo(() => getCalendarDays(calendarMonth), [calendarMonth])
+  const openPromptPreview = async (project: ProjectItem, image: ProjectImage) => {
+    const existingPrompt = getDisplayPrompt(image)
+    if (existingPrompt) {
+      setExpandedPrompt({ title: image.title || project.skillDisplayName, prompt: existingPrompt })
+      return
+    }
+    if (!image.hasPrompt || !onLoadProjectImagePrompt) return
+    const loadingKey = `${project.id}:${image.imageUrl}`
+    setPromptLoadingKey(loadingKey)
+    try {
+      const loadedPrompt = await onLoadProjectImagePrompt(project.id, image.imageUrl)
+      setExpandedPrompt({
+        title: image.title || project.skillDisplayName,
+        prompt: loadedPrompt || '这条记录没有保存提示词。',
+      })
+    } catch (promptError) {
+      onError(promptError instanceof Error ? promptError.message : '无法读取提示词。')
+    } finally {
+      setPromptLoadingKey((current) => (current === loadingKey ? '' : current))
+    }
+  }
 
   useEffect(() => {
     if (!searchOpen) return
@@ -872,6 +944,28 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
                       <>
                         <button
                           type="button"
+                          className="project-reuse-references"
+                          aria-label="复用参考图"
+                          title="复用参考图"
+                          disabled={!onReuseProjectReferences || !hasReusableProjectReferences(project)}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            try {
+                              const result = onReuseProjectReferences?.(project)
+                              if (result && typeof result.catch === 'function') {
+                                result.catch((error) =>
+                                  onError(error instanceof Error ? error.message : '参考图复用失败。'),
+                                )
+                              }
+                            } catch (reuseError) {
+                              onError(reuseError instanceof Error ? reuseError.message : '参考图复用失败。')
+                            }
+                          }}
+                        >
+                          <ReuseIcon />
+                        </button>
+                        <button
+                          type="button"
                           className="project-download-one"
                           disabled={project.images.length === 0}
                           onClick={() => {
@@ -959,7 +1053,7 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
                             {image.size ? ` · ${image.size}` : ''}
                           </span>
                         </figcaption>
-                        {image.referenceImageUrls && image.referenceImageUrls.length > 0 && (
+                        {image.referenceImageUrls && getReferenceLightboxItems(image.referenceImageUrls).length > 0 && (
                           <div className="project-reference-strip" aria-label="生成参考图">
                             {getReferenceLightboxItems(image.referenceImageUrls).map((referenceItem, referenceIndex, referenceItems) => (
                               <figure key={`${image.imageUrl}-ref-${referenceItem.imageUrl}-${referenceIndex}`}>
@@ -976,7 +1070,7 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
                             ))}
                           </div>
                         )}
-                        {getDisplayPrompt(image) && (
+                        {(getDisplayPrompt(image) || image.hasPrompt) && (
                           <div className="project-prompt-preview">
                             <button
                               type="button"
@@ -985,15 +1079,15 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
                               title="放大查看提示词"
                               onClick={(event) => {
                                 event.stopPropagation()
-                                setExpandedPrompt({
-                                  title: image.title || project.skillDisplayName,
-                                  prompt: getDisplayPrompt(image),
-                                })
+                                openPromptPreview(project, image)
                               }}
                             >
                               <ExpandPromptIcon />
                             </button>
-                            <textarea readOnly value={getDisplayPrompt(image)} />
+                            <textarea
+                              readOnly
+                              value={getDisplayPrompt(image) || (promptLoadingKey === `${project.id}:${image.imageUrl}` ? '提示词读取中...' : '点击左侧按钮读取完整提示词')}
+                            />
                           </div>
                         )}
                         {!selectionMode && (
@@ -1030,6 +1124,22 @@ export function ProjectsPanel(props: ProjectsPanelProps) {
                 )}
               </article>
               ))
+            )}
+            {hasMore && (
+              <div className="project-load-more-wrap">
+                <button
+                  type="button"
+                  className="project-load-more"
+                  disabled={loadingMore}
+                  onClick={() => {
+                    onLoadMore?.().catch((error) =>
+                      onError(error instanceof Error ? error.message : '加载更多失败。'),
+                    )
+                  }}
+                >
+                  {loadingMore ? '加载中...' : '加载更多'}
+                </button>
+              </div>
             )}
           </div>
         )}

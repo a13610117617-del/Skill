@@ -1,0 +1,6 @@
+export const angle12 = {
+  id: 'angle-12',
+  imageNumber: 12,
+  prompt: 'Selected pose prompt: right-side seated-feeling two-feet shoe display with foreground pick-up action. The model is positioned on the right side of the frame and faces or turns toward the left. The posture should read as seated or supported outside the frame, never sitting on the floor; the support object does not need to appear. Both feet are displayed in the upper area of the composition, following the selected angle image for foot placement, shoe direction, camera angle, and crop. Use a close high-angle oblique top-down camera view, like the camera is above and in front of the model feet at about a 45-degree downward angle. The view is not a flat overhead view and not an eye-level view; it must be a perspective-rich diagonal top-down product angle. One hand reaches toward or prepares to pick up the foreground display shoes. The foreground display shoes are a pair, not a single shoe, and they are only ground/display shoes with no extra legs. Preserve the right-to-left body direction, seated-feeling posture, two upper-frame feet, hand-reaching action, paired foreground display-shoe relationship, close oblique top-down perspective, and product-focused camera view from the angle image.',
+  addedPrompt: '',
+} as const

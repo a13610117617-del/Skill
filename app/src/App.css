@@ -4464,6 +4464,33 @@ button:disabled {
   background: rgba(255, 255, 255, 0.025);
 }
 
+.project-load-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 6px;
+}
+
+.project-load-more {
+  min-height: 38px;
+  padding: 0 18px;
+  border: 1px solid rgba(223, 255, 0, 0.34);
+  border-radius: 8px;
+  background: rgba(223, 255, 0, 0.08);
+  color: rgba(247, 251, 253, 0.86);
+  font-size: 0.8rem;
+}
+
+.project-load-more:hover:not(:disabled),
+.project-load-more:focus-visible {
+  border-color: rgba(223, 255, 0, 0.62);
+  color: var(--lime);
+}
+
+.project-load-more:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .project-confirm-backdrop {
   position: fixed;
   inset: 0;
@@ -4542,6 +4569,7 @@ button:disabled {
 
 .project-download-one,
 .project-delete-one,
+.project-reuse-references,
 .project-record-select {
   display: inline-flex;
   align-items: center;
@@ -4554,6 +4582,23 @@ button:disabled {
   background: rgba(255, 255, 255, 0.04);
   color: rgba(247, 251, 253, 0.78);
   font-size: 0.74rem;
+}
+
+.project-reuse-references {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+
+.project-reuse-references:hover:not(:disabled),
+.project-reuse-references:focus-visible {
+  border-color: rgba(223, 255, 0, 0.54);
+  color: var(--lime);
+}
+
+.project-reuse-references:disabled {
+  cursor: default;
+  opacity: 0.38;
 }
 
 
