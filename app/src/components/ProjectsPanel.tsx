@@ -236,14 +236,21 @@ function getReferenceLabel(url: string, index: number) {
   try {
     const parsed = new URL(url, window.location.origin)
     const tag = parsed.searchParams.get('mergeRef') || ''
+    if (tag === 'angle-1-front-foot-product-shoe') return '产品2'
+    if (tag === 'angle-2-inner-side-product-shoe') return '产品2'
+    if (tag === 'angle-3-inner-side-product-shoe') return '产品2'
+    if (tag === 'angle-5-inner-side-product-shoe') return '产品2'
     if (tag === 'angle-mask' || tag === 'original-angle-reference' || tag === 'real-photo-angle-reference') return '角度'
     if (tag === 'background') return '背景'
     if (tag === 'model-outfit-body-limbs') return '模特'
     if (tag === 'product-shoe') return '产品'
+    if (tag.startsWith('product-shoe-extra-')) return tag.replace('product-shoe-extra-', '产品')
     if (tag === 'angle-mask') return '角度'
     if (tag === 'background') return '背景'
     if (tag === 'model-outfit-body-limbs') return '模特'
     if (tag === 'product-shoe') return '产品'
+    if (tag.startsWith('product-shoe-extra-')) return tag.replace('product-shoe-extra-', '产品')
+    if (tag === 'angle-6-hand-held-product-shoe') return '产品2'
   } catch {
     // Fall through to the generic label.
   }
@@ -254,7 +261,7 @@ function shouldShowProjectReference(url: string) {
   try {
     const parsed = new URL(url, window.location.origin)
     const tag = parsed.searchParams.get('mergeRef') || ''
-    return ['angle-mask', 'original-angle-reference', 'real-photo-angle-reference', 'background', 'model-outfit-body-limbs', 'product-shoe'].includes(tag)
+    return ['angle-mask', 'original-angle-reference', 'real-photo-angle-reference', 'background', 'model-outfit-body-limbs', 'product-shoe', 'angle-1-front-foot-product-shoe', 'angle-2-inner-side-product-shoe', 'angle-3-inner-side-product-shoe', 'angle-5-inner-side-product-shoe', 'angle-6-hand-held-product-shoe'].includes(tag) || tag.startsWith('product-shoe-extra-')
   } catch {
     return false
   }

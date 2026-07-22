@@ -467,10 +467,14 @@ const mergeImageSlots: MergeImageSlot[] = [
 ]
 
 const mergeAngleBatchLimit = 10
+const mergeProductFileLimit = 4
 const mergeAngleUploadSlotIds = ['angle', 'angleHand'] as const
 type MergeAngleUploadSlotId = (typeof mergeAngleUploadSlotIds)[number]
+type MergeReferenceModalSlotId = MergeAngleUploadSlotId | 'product'
 const isMergeAngleUploadSlot = (slotId: string): slotId is MergeAngleUploadSlotId =>
   mergeAngleUploadSlotIds.includes(slotId as MergeAngleUploadSlotId)
+const isMergeMultiFileSlot = (slotId: string) => isMergeAngleUploadSlot(slotId)
+const isMergeAngle06LibraryFileName = (name: string) => /(?:^|[-_])angle[-_]?0?6(?:\D|$)|merge-angle-angle-06/i.test(name)
 
 const mergeImageSizeOptions = [
   { label: '智能尺寸', detail: '按背景图比例', value: 'auto' },
@@ -498,6 +502,22 @@ const mergeImageStrictReferenceLogic = [
   'Red regions = clothing support regions. Generate the real outfit type from the uploaded model reference only as supporting styling around the product shoes. Match the model reference clothing category, color, fabric, drape, silhouette, waistband/hem details, and styling, but the clothing must not become the main visual subject or occupy attention beyond the red mask intent. Do not invent a skirt/dress if the model reference is wearing pants, jeans, shorts, or a top. Do not copy the model reference shoes.',
   'Black regions = background regions. Generate the uploaded background image environment in all black/empty regions, including wall, floor, baseboard, light direction, atmosphere, and shadows.',
   'Priority order: product shoe as the main visual subject > angle mask pose/composition and yellow shoe placement/angle reference > body limbs that support the shoe display > model outfit as secondary styling only > background realism. Product shoe appearance must come 100% from the product shoe image only; the angle-library image and yellow mask control only placement, angle, scale, perspective, and occlusion, never shoe exterior design or silhouette.',
+  'Final image: one realistic ecommerce product-shoe hero scene focused on the lower body only. The uploaded product shoes must be the clearest main subject and visual focus. Body limbs, clothing, camera angle, perspective, scale, and occlusion follow the angle mask, but clothing stays secondary and must not dominate the image. Background comes only from the background image.',
+  'Lower-body crop rule: do not generate the model face, head, portrait, or full upper body. Show only the lower body needed for the shoe display, such as legs, feet, hands, skirt hem, pants hem, or partial waist when required by the angle mask. If the angle mask does not show the upper body, keep the upper body outside the frame.',
+  'Forbidden: any visible semantic mask colors or color-block shapes from the angle reference, including yellow blocks, blue blocks, red blocks, black blocks, flat colored silhouettes, tinted mask remnants, yellow shoes from the mask, blue limbs, red block clothing, black mask background, model face, head, portrait, full upper body, model reference shoes, model reference background/wall/floor/shadows/watermark/props, extra shoes, extra limbs, deformed hands or feet, wrong toes or fingers, text, watermark, logo, collage look.',
+].join('\n')
+
+const mergeImageAngle6DualProductStrictReferenceLogic = [
+  'STRICT MULTI-REFERENCE RULES FOR AI PRODUCT BACKGROUND FUSION - ANGLE 6 TWO-PRODUCT MODE ONLY:',
+  'The angle reference or selected angle-library image itself is the primary pose and composition control, not the text notes. Directly observe this image for body pose, foot/shoe spatial relationship, camera angle, perspective, scale, and occlusion. Any pose text or region analysis is only auxiliary explanation; if text conflicts with the angle image, follow the angle image.',
+  'The angle reference or selected angle-library image is a semantic region mask, not a style image. Read its visual regions from the image itself, then replace each region with content from the correct reference.',
+  'Yellow regions = shoe angle and placement reference only. Yellow regions only indicate where shoes appear and how they are placed, including shoe position, size, orientation, toe direction, heel direction, left-foot/right-foot side inference, body-facing direction inference, heel position, and perspective. Do not use the angle-library image or yellow mask as shoe appearance, shoe silhouette, shoe design, shoe color, material, style, shape, toe shape, heel shape, sole shape, strap/lace/buckle design, or product proportions.',
+  'Angle 6 two-product shoe identity rule: the lower-right worn shoe uses only 产品图一 / main product-shoe reference for shoe shape, color, material, texture, straps, buckle, heel, sole, toe shape, stitching, lining, and proportions. The left/upper-left hand-held display shoe uses only 产品图二 / angle-6-hand-held-product-shoe reference for actual visible shoe shape, color, material, texture, laces, eyelets, tongue, perforations, side panels, stitching, sole edge, heel patch, visible hardware, heel, toe shape, lining, and proportions. Do not simplify 产品图二 into a blank no-detail side. Do not use 产品图一 as the appearance source for the hand-held display shoe, and do not use 产品图二 as the appearance source for the worn shoe.',
+  'A yellow region connected to a blue leg/ankle/foot region is the worn shoe on the single visible foot; the yellow region connected to the green hand is the hand-held display shoe only, so generate only the product shoe there and do not add an extra leg or foot.',
+  'Blue regions = body limb regions. Identify each blue region by its silhouette and position: it may be a leg, foot/ankle segment, arm, hand, or wrist. Generate the matching natural female body part in every blue region. Limb pose, joint direction, occlusion, and body angle must follow the angle mask, while skin tone and styling can come from the model reference.',
+  'Red regions = clothing support regions. Generate the real outfit type from the uploaded model reference only as supporting styling around the product shoes. Match the model reference clothing category, color, fabric, drape, silhouette, waistband/hem details, and styling, but the clothing must not become the main visual subject or occupy attention beyond the red mask intent. Do not invent a skirt/dress if the model reference is wearing pants, jeans, shorts, or a top. Do not copy the model reference shoes.',
+  'Black regions = background regions. Generate the uploaded background image environment in all black/empty regions, including wall, floor, baseboard, light direction, atmosphere, and shadows.',
+  'Priority order: product shoes as the main visual subject > angle mask pose/composition and yellow shoe placement/angle reference > body limbs that support the shoe display > model outfit as secondary styling only > background realism. In angle 6 two-product mode, shoe appearance must come from the correct product role: 产品图一 for the worn shoe and 产品图二 for the hand-held display shoe. The angle-library image and yellow mask control only placement, angle, scale, perspective, and occlusion, never shoe exterior design or silhouette.',
   'Final image: one realistic ecommerce product-shoe hero scene focused on the lower body only. The uploaded product shoes must be the clearest main subject and visual focus. Body limbs, clothing, camera angle, perspective, scale, and occlusion follow the angle mask, but clothing stays secondary and must not dominate the image. Background comes only from the background image.',
   'Lower-body crop rule: do not generate the model face, head, portrait, or full upper body. Show only the lower body needed for the shoe display, such as legs, feet, hands, skirt hem, pants hem, or partial waist when required by the angle mask. If the angle mask does not show the upper body, keep the upper body outside the frame.',
   'Forbidden: any visible semantic mask colors or color-block shapes from the angle reference, including yellow blocks, blue blocks, red blocks, black blocks, flat colored silhouettes, tinted mask remnants, yellow shoes from the mask, blue limbs, red block clothing, black mask background, model face, head, portrait, full upper body, model reference shoes, model reference background/wall/floor/shadows/watermark/props, extra shoes, extra limbs, deformed hands or feet, wrong toes or fingers, text, watermark, logo, collage look.',
@@ -604,6 +624,22 @@ async function readJsonResponse(response: Response) {
 function safeClientFileName(value: string) {
   const name = value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/\s+/g, ' ')
   return name || 'skillcrew-image'
+}
+
+function cleanMergeProductUploadName(value: string) {
+  const name = safeClientFileName(value)
+    .replace(/merge-angle01-front-product-\d*-?/gi, '')
+    .replace(/merge-angle01-inner-product-\d*-?/gi, '')
+    .replace(/merge-angle02-inner-product-\d*-?/gi, '')
+    .replace(/merge-angle03-inner-product-\d*-?/gi, '')
+    .replace(/merge-angle04-ground-product-\d*-?/gi, '')
+    .replace(/merge-angle05-inner-product-\d*-?/gi, '')
+    .replace(/merge-angle06-hand-product-\d*-?/gi, '')
+    .replace(/merge-product-extra-\d+-/gi, '')
+    .replace(/merge-product-/gi, '')
+    .replace(/^-+/, '')
+    .trim()
+  return name || 'product-reference.png'
 }
 
 function fallbackBrowserDownload(imageUrl: string, title: string, suggestedName: string) {
@@ -797,7 +833,8 @@ function App() {
   const [multiAngleFiles, setMultiAngleFiles] = useState<Record<string, File[]>>({})
   const [mergeImageFiles, setMergeImageFiles] = useState<Record<string, File[]>>({})
   const [draggingMergeImageSlot, setDraggingMergeImageSlot] = useState('')
-  const [mergeReferenceModalSlot, setMergeReferenceModalSlot] = useState<MergeAngleUploadSlotId | ''>('')
+  const [draggingMergeReferenceIndex, setDraggingMergeReferenceIndex] = useState<number | null>(null)
+  const [mergeReferenceModalSlot, setMergeReferenceModalSlot] = useState<MergeReferenceModalSlotId | ''>('')
   const [selectedMergeAngleIds, setSelectedMergeAngleIds] = useState<string[]>([])
   const [mergeAngleLibraryAnalyses, setMergeAngleLibraryAnalyses] = useState<Record<string, string>>({})
   const [mergeImageSize, setMergeImageSize] = useState('auto')
@@ -944,6 +981,10 @@ function App() {
     )
     return Object.fromEntries(entries)
   }, [mergeImageFiles])
+  const canMergeSlotUseMultiple = (slotId: string) =>
+    isMergeMultiFileSlot(slotId) || slotId === 'product'
+  const mergeSlotFileLimit = (slotId: string) =>
+    slotId === 'product' ? mergeProductFileLimit : mergeAngleBatchLimit
   const previewItems = previewImages.length > 0
     ? [
         ...previewImages.map((item) => ({ ...item, kind: 'image' as const })),
@@ -1871,8 +1912,8 @@ function App() {
     setError('')
     setMergeImageFiles((current) => ({
       ...current,
-      [slotId]: isMergeAngleUploadSlot(slotId)
-        ? [...(current[slotId] || []), ...images].slice(0, mergeAngleBatchLimit)
+      [slotId]: canMergeSlotUseMultiple(slotId)
+        ? [...(current[slotId] || []), ...images].slice(0, mergeSlotFileLimit(slotId))
         : [images[0]],
     }))
     if (isMergeAngleUploadSlot(slotId)) setSelectedMergeAngleIds([])
@@ -1903,7 +1944,18 @@ function App() {
     }))
   }
 
-  function mergeReferenceSlotLabel(slotId: MergeAngleUploadSlotId) {
+  function moveMergeImage(slotId: string, fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return
+    setMergeImageFiles((current) => {
+      const files = [...(current[slotId] || [])]
+      if (!files[fromIndex] || toIndex < 0 || toIndex >= files.length) return current
+      const [moved] = files.splice(fromIndex, 1)
+      files.splice(toIndex, 0, moved)
+      return { ...current, [slotId]: files }
+    })
+  }
+
+  function mergeReferenceSlotLabel(slotId: MergeReferenceModalSlotId) {
     return mergeImageSlots.find((slot) => slot.id === slotId)?.label || '角度参考图'
   }
 
@@ -1949,6 +2001,7 @@ function App() {
     ) {
       return ''
     }
+    if (name.includes('merge-angle01-front-product-') || name.includes('merge-angle01-inner-product-') || name.includes('merge-angle02-inner-product-') || name.includes('merge-angle03-inner-product-') || name.includes('merge-angle04-ground-product-') || name.includes('merge-angle05-inner-product-') || name.includes('merge-angle06-hand-product-')) return 'product'
     if (name.includes('merge-product-')) return 'product'
     if (name.includes('merge-background-')) return 'background'
     if (name.includes('merge-model-')) return 'model'
@@ -1981,8 +2034,8 @@ function App() {
       const nextFiles: Record<string, File[]> = {}
       for (const item of reusableFiles) {
         const restoredFile = await fileFromProjectUpload(item.file)
-        nextFiles[item.slotId] = isMergeAngleUploadSlot(item.slotId)
-          ? [...(nextFiles[item.slotId] || []), restoredFile].slice(0, mergeAngleBatchLimit)
+        nextFiles[item.slotId] = canMergeSlotUseMultiple(item.slotId)
+          ? [...(nextFiles[item.slotId] || []), restoredFile].slice(0, mergeSlotFileLimit(item.slotId))
           : [restoredFile]
       }
       setMergeImageFiles((current) => ({ ...current, ...nextFiles }))
@@ -2000,6 +2053,7 @@ function App() {
 
   async function describeAngleColorBlocks(file: File, sourceLabel = '?????') {
     try {
+      const isAngle06Template = /\bangle-06\b/.test(sourceLabel)
       const bitmap = await createImageBitmap(file)
       const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height))
       const width = Math.max(1, Math.round(bitmap.width * scale))
@@ -2026,6 +2080,7 @@ function App() {
         const a = pixels[offset + 3]
         if (a < 24) continue
         if (r > 150 && g > 125 && b < 135 && r + g > b * 2 + 110) masks.yellow[index] = 1
+        else if (isAngle06Template && g > 150 && r < 130 && b < 130 && g > r * 1.25 && g > b * 1.25) masks.green[index] = 1
         else if (b > 110 && r < 135 && g < 170 && b > r * 1.15 && b > g * 1.05) masks.blue[index] = 1
         else if (r > 135 && g < 130 && b < 130 && r > g * 1.2 && r > b * 1.2) masks.red[index] = 1
         else if (r < 48 && g < 48 && b < 48) masks.black[index] = 1
@@ -2115,8 +2170,15 @@ function App() {
         return 'clothing support region ' + (index + 1) + ': ' + placement + ', bbox left ' + box.left + '%, top ' + box.top + '%, width ' + box.boxWidth + '%, height ' + box.boxHeight + '%, center (' + box.centerX + '%, ' + box.centerY + '%). Fill with the actual clothing category from the model reference, interpreted as ' + areaReading + '. Preserve model-reference clothing color, fabric, silhouette, waistband/hem details, and styling, but keep clothing secondary to the product shoes; do not invent a skirt/dress if the model reference wears pants, jeans, shorts, or a top. Keep clothing position aligned to this red area.'
       }
 
+      const describeGreenHand = (component: AngleComponent, index: number) => {
+        const box = metrics(component)
+        const placement = positionName(box.centerX, box.centerY)
+        return 'green hand region ' + (index + 1) + ': ' + placement + ', bbox left ' + box.left + '%, top ' + box.top + '%, width ' + box.boxWidth + '%, height ' + box.boxHeight + '%, center (' + box.centerX + '%, ' + box.centerY + '%). Generate one natural hand/wrist/forearm here, entering from the upper frame and holding the nearby yellow display shoe with an index-finger-hook hold: the index finger bends like a hook into or around the shoe back heel / rear heel opening. This is not a pinching hold; do not pinch the back heel between thumb and index finger, do not squeeze the rear heel with fingertips, and do not clamp the heel counter. This green region is a hand, not a foot or leg; do not use a full-palm grip or pinch the shoe body.'
+      }
+
       const yellow = findComponents(masks.yellow)
       const blue = findComponents(masks.blue)
+      const green = isAngle06Template ? findComponents(masks.green) : []
       const red = findComponents(masks.red)
       const black = findComponents(masks.black, 0.01).slice(0, 3)
       const mainShoe = yellow[0] ? metrics(yellow[0]) : null
@@ -2131,14 +2193,22 @@ function App() {
       const blackText = black.length ? black.map((component, index) => { const box = metrics(component); return 'background region ' + (index + 1) + ': ' + positionName(box.centerX, box.centerY) + ', bbox left ' + box.left + '%, top ' + box.top + '%, width ' + box.boxWidth + '%, height ' + box.boxHeight + '%' }).join(' | ') + '. Fill all black/empty areas with the uploaded background image environment.' : 'Black background region: fill all non-colored empty areas with uploaded background image environment.'
       const resultLines = [
         'Uploaded-angle semantic analysis for ' + sourceLabel + ': this image is a semantic pose/composition template, not a style/color/material reference. If this is a color-block image, use the color mapping below; if it is a real photo, sketch, or mixed reference, infer equivalent shoe/body/clothing/background roles from the visible layout.',
-        'Color meaning for masks: yellow=shoe angle/placement reference only, blue=body limb region that must be identified by silhouette as leg/ankle/foot or arm/hand/wrist, red=secondary model outfit/clothing support area, black=background from uploaded background image. No visible yellow/blue/red/black color blocks or tinted mask remnants may appear in the final image.',
+        isAngle06Template
+          ? 'Color meaning for angle-06 masks: yellow=shoe angle/placement reference only, blue=foot/lower-leg region only, green=hand/wrist/arm holding a display shoe, red=skirt/lower-garment support area, black=background from uploaded background image. No visible yellow/blue/green/red/black color blocks or tinted mask remnants may appear in the final image.'
+          : 'Color meaning for masks: yellow=shoe angle/placement reference only, blue=body limb region that must be identified by silhouette as leg/ankle/foot or arm/hand/wrist, red=secondary model outfit/clothing support area, black=background from uploaded background image. No visible yellow/blue/red/black color blocks or tinted mask remnants may appear in the final image.',
         'Universal object-count rule: count real main shoe objects from the overall visual intent, not from disconnected color fragments. Shoe straps, buckles, openings, toe gaps, heel gaps, lace gaps, stitching, internal black holes, inner shadows, and thin dividing lines belong to the nearest main shoe and must not become extra shoes. Internal black marks inside a shoe are shoe openings/details, not background.',
         yellow.length ? 'Raw yellow placement fragments observed, not authoritative shoe count: ' + yellow.map(describeShoe).join(' | ') + ' Do not count these raw fragments as shoes. The cleaned control MAIN SHOE COUNT LOCK and S labels are authoritative; merge straps, openings, buckles, detail fragments, and split/overlapping shoe pieces into the real main shoe objects.' : 'Yellow shoe placement reference regions: none detected; do not invent extra shoes beyond visible uploaded-angle intent.',
-        blue.length ? 'Blue body-limb regions: ' + blue.map(describeBlueLimb).join(' | ') : 'Blue body-limb regions: none detected; do not invent extra limbs unless required by shoe-on-foot context.',
+        isAngle06Template
+          ? 'Angle-06 hard count and role lock: generate exactly two product shoes total, exactly one visible foot/lower leg wearing the lower/right yellow shoe, exactly one hand holding the left/upper-left display shoe, and red only as skirt/lower-garment crop. Angle-06 shoe-position lock: preserve the reference positions strictly; the hand-held display shoe stays left/upper-left beside the worn lower-right shoe, and the empty gap between the two shoes must be compact, no more than half of one shoe length. Do not separate the shoes farther, stack them, overlap them, swap sides, or move either shoe away from its reference region. The worn shoe is a one-third side / three-quarter side view with toe/front aimed toward the lower-left corner. The hand-held shoe is the opposite-side shoe of the pair, not a duplicate of the worn shoe; the hand must use an index-finger-hook hold: hook the index finger into or around the shoe back heel / rear heel opening and carry the shoe from that hooked back-heel point. This must not become a thumb-and-index-finger pinch: do not pinch the back heel, do not squeeze the rear heel with fingertips, and do not clamp the heel counter. The thumb and other fingers may only lightly stabilize near the heel edge; do not use a full-palm grip, do not pinch the shoe body, do not grab the toe/front, and do not hold the strap as the main grip. If the product has buckle/clasp/ring/strap-fastener hardware, the two shoes must show mirrored left/right hardware placement and the buckles must not appear on the same side of both shoes. Do not generate a second foot, second leg, upper body, face, or a foot inside the hand-held display shoe.'
+          : '',
+        blue.length ? (isAngle06Template ? 'Blue foot/lower-leg regions: ' : 'Blue body-limb regions: ') + blue.map(describeBlueLimb).join(' | ') : 'Blue body-limb regions: none detected; do not invent extra limbs unless required by shoe-on-foot context.',
+        green.length ? 'Green hand regions: ' + green.map(describeGreenHand).join(' | ') : '',
         red.length ? 'Red clothing regions: ' + red.map(describeClothing).join(' | ') : 'Red clothing regions: none detected; if model is uploaded, use only cropped/minimal outfit consistent with the mask.',
         'Black background regions: ' + blackText,
         'Pose and camera interpretation: ' + cameraNotes.join('; ') + '. Use these notes to decide generated angle, body pose, shoe placement, and lens framing.',
-        'Hard rule: final output must not show any pure yellow, blue, red, or black mask colors, flat color-block silhouettes, or tinted mask remnants; replace each semantic region with realistic content from its assigned reference.',
+        isAngle06Template
+          ? 'Hard rule: final output must not show any pure yellow, blue, green, red, or black mask colors, flat color-block silhouettes, or tinted mask remnants; replace each semantic region with realistic content from its assigned reference.'
+          : 'Hard rule: final output must not show any pure yellow, blue, red, or black mask colors, flat color-block silhouettes, or tinted mask remnants; replace each semantic region with realistic content from its assigned reference.',
       ]
       return resultLines.join('\n')
     } catch {
@@ -5980,8 +6050,10 @@ function App() {
   }
   async function oneClickMergeImage() {
     if (!skill) return
-    const productFile = (mergeImageFiles.product || [])[0]
+    const productFiles = mergeImageFiles.product || []
+    const productFile = productFiles[0]
     const backgroundFile = (mergeImageFiles.background || [])[0]
+    const angle06LibraryItem = mergeAngleLibrary.find((item) => item.id === 'angle-06')
     const uploadedAngleItems = [
       ...(mergeImageFiles.angle || []).map((file, index) => ({
         file,
@@ -6027,15 +6099,20 @@ function App() {
       uploadedFile: File | null
       uploadedAngleKind?: 'standard' | 'hand'
     }> = uploadedAngleItems.length > 0
-      ? uploadedAngleItems.map((item, index) => ({
-          id: item.source === 'hand'
-            ? `uploaded-angle-hand-${index + 1}`
-            : `uploaded-angle-${index + 1}`,
-          label: item.label,
-          url: '',
-          uploadedFile: item.file,
-          uploadedAngleKind: item.source,
-        }))
+      ? uploadedAngleItems.map((item, index) => {
+          if (item.source === 'standard' && angle06LibraryItem && isMergeAngle06LibraryFileName(item.file.name)) {
+            return { id: angle06LibraryItem.id, label: angle06LibraryItem.label, url: angle06LibraryItem.url, uploadedFile: null }
+          }
+          return {
+            id: item.source === 'hand'
+              ? `uploaded-angle-hand-${index + 1}`
+              : `uploaded-angle-${index + 1}`,
+            label: item.label,
+            url: '',
+            uploadedFile: item.file,
+            uploadedAngleKind: item.source,
+          }
+        })
       : selectedLibraryAngles.map((item) => ({ id: item.id, label: item.label, url: item.url, uploadedFile: null }))
     setPendingPreviewCards(generationAngles.map((item) => ({ id: item.id, title: `${item.label} 生图中` })))
     try {
@@ -6047,6 +6124,13 @@ function App() {
       const generatedImages: GeneratedImage[] = []
       let lastGenerated: ImageResult | null = null
       for (const angleItem of generationAngles) {
+        const angle01FrontProductFiles = angleItem.id === 'angle-01' ? productFiles.slice(1, mergeProductFileLimit) : []
+        const angle02InnerProductFiles = angleItem.id === 'angle-02' ? productFiles.slice(1, mergeProductFileLimit) : []
+        const angle03InnerProductFiles = angleItem.id === 'angle-03' ? productFiles.slice(1, mergeProductFileLimit) : []
+        const angle04GroundProductFiles = angleItem.id === 'angle-04' ? productFiles.slice(1, mergeProductFileLimit) : []
+        const angle05InnerProductFiles = angleItem.id === 'angle-05' ? productFiles.slice(1, mergeProductFileLimit) : []
+        const angle06HandProductFiles = angleItem.id === 'angle-06' ? productFiles.slice(1, mergeProductFileLimit) : []
+        const extraProductReferenceFiles = angleItem.id === 'angle-01' || angleItem.id === 'angle-02' || angleItem.id === 'angle-03' || angleItem.id === 'angle-04' || angleItem.id === 'angle-05' || angleItem.id === 'angle-06' ? [] : productFiles.slice(1, mergeProductFileLimit)
         const angleFile = angleItem.uploadedFile || await fileFromAsset(angleItem.url, `${angleItem.id}.png`)
         const isHandAngleUpload = angleItem.uploadedFile && angleItem.uploadedAngleKind === 'hand'
         const isSingleFootAngleUpload = false
@@ -6076,11 +6160,42 @@ function App() {
             ].filter(Boolean).join('\n'))
           : ''
         const prompt = [
-          angleItem.uploadedFile ? '' : mergeImageStrictReferenceLogic,
+          angleItem.uploadedFile
+            ? ''
+            : angleItem.id === 'angle-06' && angle06HandProductFiles.length
+              ? mergeImageAngle6DualProductStrictReferenceLogic
+              : mergeImageStrictReferenceLogic,
           angleItem.uploadedFile
             ? uploadedAnglePrompt
             : `Selected angle-library template: ${angleItem.label} (${angleItem.id}.png). This merge-angle image is the only pose/composition/semantic-mask template for this generation.`,
           angleItem.uploadedFile ? '' : mergeAnglePosePrompts[angleItem.id],
+          !angleItem.uploadedFile && angleItem.id === 'angle-01' && angle01FrontProductFiles.length
+            ? 'Selected pose prompt angle 1 two-product ankle-side lock: this rule applies only when angle 1 has more than one product shoe image. Keep the original angle-01 single-product logic unchanged when only one product image is uploaded. In two-product mode, Product image 1 / main product-shoe reference is the authoritative source for the shoe OUTER side appearance. Product image 2 / angle-1-inner-side-product-shoe reference is the authoritative source for the shoe INNER side appearance. Follow the angle-01 marked reference: the FRONT FOOT / lower-left planted shoe displays the model medial ankle / INNER side and must use Product image 2; the REAR FOOT / upper-right lifted shoe displays the model lateral ankle / OUTER side and must use Product image 1. Do not assign by generic screen side alone. Generate the two worn shoes as a real left-foot/right-foot pair according to the marked front-foot inner-side and rear-foot outer-side relationship, not two copies of the same shoe side. Do not swap inner/outer roles. Do not treat Product image 2 as a background, model, clothing, angle mask, third shoe, hand-held shoe, or generic supplementary view. Preserve the angle-01 walking-left pose, front foot lower-left planted position, rear foot upper-right lifted-heel position, toe direction, heel lift, and close product-focused crop. Camera and crop lock for angle 1 two-product mode: focus tightly on the shoes; shoes must be the largest, clearest, sharpest subject. Show only shoes, feet, ankles, and necessary lower legs. Do not show the model area above the thighs: no hips, waist, torso, upper body, head, face, or full-body view.'
+            : '',
+          !angleItem.uploadedFile && angleItem.id === 'angle-01' && !angle01FrontProductFiles.length
+            ? 'Selected pose prompt angle 1 single-product left/right pair lock: this rule applies only when angle 1 has exactly one uploaded product shoe image. The single product image is the source for shoe style, color, material, texture, toe shape, heel shape, strap, buckle, sole, stitching, and proportions, but the final two worn shoes must be a real left-shoe/right-shoe pair, not two same-side copies. If the uploaded product image shows a pair of shoes like a catalog pair photo, first inspect the middle area where the two shoes face or overlap each other: the side facing the middle between the pair is the inner/no-buckle side when no buckle/clasp/ring is visible there. Use that middle no-buckle side as the opposite-side inference; the outer side may contain the buckle, but the mirrored shoe side should show the no-buckle inner side where appropriate. Generate the front-foot shoe and rear-foot shoe as opposite sides of the same pair while preserving the angle-01 walking-left pose: front foot leading lower-left/front, rear foot trailing behind/right with heel lifted, both shoe toes pointing left. Do not duplicate the same product-side shoe twice, do not merely copy/paste, rotate, or translate the same shoe, and do not put buckle/clasp/ring/strap-fastener hardware on the same side of both worn shoes. Camera and crop lock for angle 1 single-product mode: focus tightly on the shoes; shoes must be the largest, clearest, sharpest subject. Show only shoes, feet, ankles, and necessary lower legs. Do not show the model area above the thighs: no hips, waist, torso, upper body, head, face, or full-body view.'
+            : '',
+          !angleItem.uploadedFile && angleItem.id === 'angle-06' && angle06HandProductFiles.length
+            ? 'Selected pose prompt angle 6 multi-product reference lock: this rule applies only when angle 6 has more than one product shoe image. If only one product shoe image is uploaded, use the normal angle-6 single-product logic. If two product shoe images are uploaded, the main product-shoe reference / 产品图一 controls only the shoe worn on the single visible foot. The angle-6-hand-held-product-shoe reference / 产品图二 controls only the left/upper-left hand-held display shoe and is the authoritative appearance source for that hand-held shoe. The hand-held display shoe must match the actual visible appearance of 产品图二 in shoe shape, color, material, texture, toe shape, heel shape, opening, side panels, laces, eyelets, tongue, perforations, stitching, sole edge, heel patch, visible hardware, proportions, and hand-held display angle. Do not simplify 产品图二 into a blank no-detail side, and do not remove laces, eyelets, tongue, perforation panels, stitching, or other visible details because of older no-buckle wording. If 产品图二 shows no buckle or clasp on its visible side, do not invent one; if 产品图二 shows visible hardware, preserve it exactly. This 产品图二 role rule overrides any generic product-shoe lock for the hand-held display shoe only; the worn shoe still follows 产品图一. Do not let 产品图一 override the hand-held shoe appearance when 产品图二 is provided. Do not swap the two product roles. Do not use 产品图二 as background, model, angle mask, clothing, or a separate third shoe. Generate exactly two shoes total: one worn shoe from 产品图一 and one hand-held display shoe whose exterior appearance matches 产品图二 / angle-6-hand-held-product-shoe.'
+            : '',
+          !angleItem.uploadedFile && angleItem.id === 'angle-02' && angle02InnerProductFiles.length
+            ? 'Selected pose prompt angle 2 two-product inner/outer side lock: this rule applies only when angle 2 has more than one product shoe image. Keep the original angle-02 seated first-person lower-leg pose and single-product logic unchanged when only one product image is uploaded. In two-product mode, Product image 1 / main product-shoe reference is the authoritative source for the shoe OUTER side appearance. Product image 2 / angle-2-inner-side-product-shoe reference is the authoritative source for the shoe INNER side appearance. Generate the two worn shoes like the selected angle-02 reference: the two shoes are worn on both feet in the seated first-person crossed-leg pose; the two sides that face each other near the middle gap are the OUTER sides and must use Product image 1; the far left edge of the left/lower shoe and the far right edge of the right/upper shoe are the INNER sides and must use Product image 2. Do not swap inner and outer sides. Do not treat Product image 2 as a third shoe, background, model, foot, leg, or generic supplementary view. Keep both shoes worn on feet and preserve the angle-02 shoe placement, toe direction, leg pose, and close shoe-focused crop.'
+            : '',
+          !angleItem.uploadedFile && angleItem.id === 'angle-03' && angle03InnerProductFiles.length
+            ? 'Selected pose prompt angle 3 two-product inner/outer side lock: this rule applies only when angle 3 has more than one product shoe image. Keep the original angle-03 hand-only product display logic unchanged: no feet, no legs, no worn shoes, only hands holding/supporting product shoes. Product image 1 / main product-shoe reference is the authoritative source for the shoe OUTER side appearance. Product image 2 / angle-3-inner-side-product-shoe reference is the authoritative source for the shoe INNER side appearance. Generate the two displayed shoes like the selected angle-03 reference: the two shoes are close together, and the sides that touch or nearly touch in the middle are the INNER sides; the left outside edge of the left shoe and the right outside edge of the right shoe are the OUTER sides. Apply Product image 2 only to the two middle-facing inner sides. Apply Product image 1 to the outside-facing outer sides. Do not swap inner and outer sides. Do not treat Product image 2 as a third shoe, background, model, foot, leg, or generic supplementary view. Keep the two shoes close together with their inner sides adjacent, not separated far apart.'
+            : '',
+          !angleItem.uploadedFile && angleItem.id === 'angle-04' && angle04GroundProductFiles.length
+            ? 'Selected pose prompt angle 4 two-product foot-role lock: this rule applies only when angle 4 has more than one product shoe image. Keep the original angle-04 single-product logic unchanged when only one product image is uploaded. In two-product mode, Product image 1 / main product-shoe reference controls only the raised/lifted-foot worn shoe marked 图一 in the selected angle-04 reference. Product image 2 / angle-4-ground-foot-product-shoe reference controls only the grounded/standing-foot worn shoe marked 图二 in the selected angle-04 reference. Do not swap the two product roles. The raised foot shoe must match Product image 1 and the grounded foot shoe must match Product image 2. Both shoes remain worn on their assigned feet; Product image 2 is not a display shoe, hand-held shoe, background, model, clothing, angle mask, third shoe, or generic supplementary view. Preserve the angle-04 pose: one foot is lifted behind/upper-right according to the 图一 label, and the other foot is planted on the ground/lower-left according to the 图二 label. Keep lower-body-only, close product-shoe-focused framing.'
+            : '',
+          !angleItem.uploadedFile && angleItem.id === 'angle-05' && angle05InnerProductFiles.length
+            ? 'Selected pose prompt angle 5 two-product ankle-side lock: this rule applies only when angle 5 has more than one product shoe image. Keep the original angle-05 single-product logic unchanged when only one product image is uploaded. In two-product mode, Product image 1 / main product-shoe reference is the authoritative source for the shoe OUTER side appearance. Product image 2 / angle-5-inner-side-product-shoe reference is the authoritative source for the shoe INNER side appearance. Judge shoe side by the model ankle anatomy and the angle-05 marked reference, not by left/right screen position alone: the OUTER side must appear on the lateral malleolus / outer-ankle side of each foot; the INNER side must appear on the medial malleolus / inner-ankle side of each foot. Generate the two worn shoes as a real left-foot/right-foot pair according to ankle sides, not two copies of the same shoe side. Do not swap inner/outer roles. Do not treat Product image 2 as background, model, clothing, angle mask, third shoe, hand-held shoe, or generic supplementary view. Preserve the angle-05 pose, foot positions, toe direction, lower-body crop, and close product-focused composition.'
+            : '',
+          !angleItem.uploadedFile && angleItem.id !== 'angle-06' && extraProductReferenceFiles.length
+            ? 'Selected angle product multi-reference lock: multiple product shoe images are uploaded for this angle. Product image 1 is the primary product-shoe identity reference; product image 2 and later images are supplementary references for the same shoe SKU, used to preserve details that are clearer in other views, such as side shape, buckle/clasp/ring, strap anchor, toe shape, heel shape, opening, material texture, sole edge, stitching, lining, and proportions. Do not treat the extra product images as extra shoes to add to the scene. Do not change the angle-library shoe count or layout because of extra product images. Use all product references together to reconstruct the same product accurately in the yellow shoe regions.'
+            : '',
+          !angleItem.uploadedFile && angleItem.id === 'angle-06' && !angle06HandProductFiles.length
+            ? 'Selected pose prompt angle 6 single-product left/right pair lock: this rule applies only when angle 6 has exactly one uploaded product shoe image. The single product image is the source for shoe style, color, material, texture, toe shape, heel shape, strap, buckle, sole, stitching, and proportions, but the final two visible shoes must be a real left-shoe/right-shoe pair, not two same-side copies. If the uploaded product image shows a pair of shoes like a catalog pair photo, first inspect the middle area where the two shoes face or overlap each other: the side facing the middle between the pair is the inner/no-buckle side when no buckle/clasp/ring is visible there. Use that middle no-buckle side as the opposite-side inference; the outer side may contain the buckle, but the mirrored shoe side should show the no-buckle inner side where appropriate. Generate one shoe as the worn shoe on the single visible foot and synthesize the other shoe as the opposite-side hand-held display shoe. The hand-held display shoe must mirror the worn shoe side structurally: toe-box curve, opening shape, inner wall, outer wall, side seam, strap anchor, buckle/clasp/ring position, and heel counter must read as the matching opposite shoe side. Do not duplicate the same product-side shoe twice, do not merely copy/paste, rotate, or translate the same shoe, and do not put buckle/clasp/ring/strap-fastener hardware on the same side of both shoes. Keep both shoe toe/front directions consistent with the angle-06 reference while changing only the left/right shoe side relationship.'
+            : '',
           !angleItem.uploadedFile && angleItem.id === 'angle-19'
             ? 'Selected pose prompt angle 17 toe-direction lock: the unworn display shoe toe/front must point in exactly the same canvas direction as the worn shoe toe/front. For angle 17, both shoe toes/fronts point toward the upper-left of the image and both heels point toward the lower-right. Do not rotate the display shoe toward another direction, do not point the display shoe downward, rightward, or opposite to the worn shoe, and do not use left/right pairing by reversing the display shoe toe direction.'
             : '',
@@ -6097,7 +6212,23 @@ function App() {
             : uploadedAngleIsRealPhoto
             ? 'The uploaded real angle photo must dominate pose and camera: shoe count, shoe placement, shoe direction, toe direction, heel direction, shoe angle, body-facing direction, foot/leg/hand/arm pose, camera height, lens perspective, scale relationship, crop, overlap, and occlusion must follow the real angle photo rather than the product photo or model photo. Do not convert it into a color-block mask workflow.'
             : 'The angle mask plus code-generated structure analysis must dominate pose and shoe layout: shoe count, shoe placement, shoe direction, toe direction, heel direction, body-facing direction, hand/foot candidate roles, shoe-limb bindings, depth ordering, camera angle, scale relationship, and occlusion must follow the angle reference rather than the product photo or model photo.',
-          isHandAngleUpload
+          !angleItem.uploadedFile && angleItem.id === 'angle-01' && angle01FrontProductFiles.length
+            ? 'Angle 1 two-product shoe identity must dominate by the marked front/rear foot sides: 产品图二 / angle-1-inner-side-product-shoe controls the FRONT FOOT / lower-left planted shoe because that visible side is the INNER side at the medial ankle. 产品图一 / main product-shoe reference controls the REAR FOOT / upper-right lifted shoe because that visible side is the OUTER side at the lateral ankle. Do not generate two same-side shoes, do not copy 产品图一 onto the front-foot inner side, and do not copy 产品图二 onto the rear-foot outer side. The final two worn shoes must read as a real left/right pair: front foot = inner-side shoe from 产品图二, rear foot = outer-side shoe from 产品图一. Final angle-1 two-product framing check: the composition must be a close product-shoe shot; crop out everything above the thighs and avoid showing hips, waist, torso, upper body, head, or face.'
+            : !angleItem.uploadedFile && angleItem.id === 'angle-02' && angle02InnerProductFiles.length
+            ? 'Angle 2 two-product shoe identity must dominate correctly by shoe side: 产品图一 / main product-shoe reference controls the outer sides of the two worn shoes; 产品图二 / angle-2-inner-side-product-shoe controls the inner sides of the two worn shoes. In the angle-02 reference, the sides close to the center gap are OUTER sides and must match 产品图一; the far left and far right side edges are INNER sides and must match 产品图二. The two shoes must stay worn on both feet in the seated first-person crossed-leg pose. Do not use only 产品图一 for both inner and outer sides, and do not use 产品图二 as an extra shoe.'
+            : !angleItem.uploadedFile && angleItem.id === 'angle-03' && angle03InnerProductFiles.length
+            ? 'Angle 3 two-product shoe identity must dominate correctly by shoe side: 产品图一 / main product-shoe reference controls the outer sides of the displayed shoes; 产品图二 / angle-3-inner-side-product-shoe controls the inner sides where the two shoes are adjacent in the middle. The two shoes must stay tightly next to each other like the angle-03 reference: inner side faces inner side in the center, outer sides face outward on the two far edges. The side details, opening, strap anchor, buckle/clasp/ring visibility, material texture, stitching, sole edge, and shoe wall shape on the inner sides must match 产品图二. The outer sides must match 产品图一. Do not use only 产品图一 for both inner and outer sides, and do not use 产品图二 as an extra shoe.'
+            : !angleItem.uploadedFile && angleItem.id === 'angle-04' && angle04GroundProductFiles.length
+            ? 'Angle 4 two-product shoe identity must dominate correctly by foot role: 产品图一 / main product-shoe reference controls only the raised/lifted-foot worn shoe marked 图一 in the angle-04 reference; 产品图二 / angle-4-ground-foot-product-shoe reference controls only the grounded/standing-foot worn shoe marked 图二 in the angle-04 reference. The raised-foot shoe must match 产品图一, not 产品图二. The grounded-foot shoe must match 产品图二, not 产品图一. Do not use a single product image for both feet in angle-4 two-product mode.'
+            : !angleItem.uploadedFile && angleItem.id === 'angle-05' && angle05InnerProductFiles.length
+            ? 'Angle 5 two-product shoe identity must dominate correctly by ankle side: 产品图一 / main product-shoe reference controls the OUTER sides of the shoes, placed on the lateral malleolus / outer-ankle side of each foot. 产品图二 / angle-5-inner-side-product-shoe reference controls the INNER sides of the shoes, placed on the medial malleolus / inner-ankle side of each foot. Follow the angle-05 reference labels for which visible side is 外侧/内侧. Do not generate two same-side shoes, do not copy the same shoe side onto both feet, and do not decide by screen left/right alone. The final two worn shoes must read as a left/right pair with outer side on outer ankle and inner side on inner ankle.'
+            : !angleItem.uploadedFile && angleItem.id === 'angle-01'
+            ? 'Angle 1 single-product final pair verification: use the one uploaded product image for the shared shoe design only, then render the two worn shoes as opposite left/right sides of the same pair. Before deciding buckle placement, inspect whether the product image already shows a left/right pair; if the middle-facing side between the two shoes has no buckle/clasp/ring, treat that as the no-buckle inner side of the shoe pair. The front-foot shoe and rear-foot shoe must not be the same-side shoe. If both shoes show the buckle/clasp/ring/strap-fastener on the same side, if the shoe that should show the inner/no-buckle side gains a buckle, or if the shoe openings, inner/outer walls, side seams, strap anchors, toe-box curves, or heel counters look like duplicated same-side copies, the result is wrong. Preserve the product design while synthesizing the correct opposite-side mate for the other foot. Final angle-1 single-product framing check: the composition must be a close product-shoe shot; crop out everything above the thighs and avoid showing hips, waist, torso, upper body, head, or face.'
+            : !angleItem.uploadedFile && angleItem.id === 'angle-06' && angle06HandProductFiles.length
+            ? 'Angle 6 two-product shoe identity must dominate correctly by role: 产品图一 / main product-shoe reference controls only the worn shoe on the single visible foot; 产品图二 / angle-6-hand-held-product-shoe reference controls only the hand-held display shoe. The hand-held display shoe must match 产品图二, not 产品图一. Preserve 产品图二 actual visible details on the hand-held shoe, including laces, eyelets, tongue, perforations, stitching, side panels, sole edge, heel patch, visible hardware, material texture, and proportions. The worn shoe must match 产品图一. Do not use a single product image for both shoes in this angle-6 two-product mode.'
+            : !angleItem.uploadedFile && angleItem.id === 'angle-06'
+            ? 'Angle 6 single-product final pair verification: use the one uploaded product image for the shared shoe design only, then render the two visible shoes as opposite left/right sides of the same pair. Before deciding buckle placement, inspect whether the product image already shows a left/right pair; if the middle-facing side between the two shoes has no buckle/clasp/ring, treat that as the no-buckle inner side of the shoe pair. The worn shoe and hand-held display shoe must not be the same-side shoe. If both shoes show the buckle/clasp/ring/strap-fastener on the same side, if the shoe that should show the inner/no-buckle side gains a buckle, or if the shoe openings/side seams/strap anchors look like duplicated same-side copies, the result is wrong. Preserve the product design while synthesizing the correct opposite-side mate.'
+            : isHandAngleUpload
             ? 'The product shoe image must dominate shoe identity: replace every yellow/S shoe in the hand-angle control with the exact uploaded product shoe while preserving shoe placement, angle, size, toe direction, heel direction, perspective, worn/display/hand-supported role, hand/foot relationship, and occlusion. The final shoe must match the uploaded product shoe image 100%.'
             : isSingleFootAngleUpload
             ? 'The product shoe image must dominate shoe identity: redraw the exact uploaded product shoe according to the single-foot S/yellow placement and angle reference objects. Yellow/S objects only control shoe placement, angle, size, toe direction, heel position, perspective, and worn/display role; they never control shoe exterior appearance, silhouette, color, material, shape, style, sole, heel, toe, straps, buckles, laces, or details. The final shoe must match the uploaded product shoe image 100%.'
@@ -6123,6 +6254,55 @@ function App() {
         sharedFiles.forEach(({ image, name }) => {
           generateForm.append('images', image, name)
         })
+        for (const [index, extraProductFile] of angle01FrontProductFiles.entries()) {
+          generateForm.append(
+            'images',
+            await compressMergeReferenceFile(extraProductFile, 'product'),
+            `merge-angle01-inner-product-${index + 2}-${cleanMergeProductUploadName(extraProductFile.name)}`,
+          )
+        }
+        for (const [index, extraProductFile] of angle02InnerProductFiles.entries()) {
+          generateForm.append(
+            'images',
+            await compressMergeReferenceFile(extraProductFile, 'product'),
+            `merge-angle02-inner-product-${index + 2}-${cleanMergeProductUploadName(extraProductFile.name)}`,
+          )
+        }
+        for (const [index, extraProductFile] of angle03InnerProductFiles.entries()) {
+          generateForm.append(
+            'images',
+            await compressMergeReferenceFile(extraProductFile, 'product'),
+            `merge-angle03-inner-product-${index + 2}-${cleanMergeProductUploadName(extraProductFile.name)}`,
+          )
+        }
+        for (const [index, extraProductFile] of angle04GroundProductFiles.entries()) {
+          generateForm.append(
+            'images',
+            await compressMergeReferenceFile(extraProductFile, 'product'),
+            `merge-angle04-ground-product-${index + 2}-${cleanMergeProductUploadName(extraProductFile.name)}`,
+          )
+        }
+        for (const [index, extraProductFile] of angle05InnerProductFiles.entries()) {
+          generateForm.append(
+            'images',
+            await compressMergeReferenceFile(extraProductFile, 'product'),
+            `merge-angle05-inner-product-${index + 2}-${cleanMergeProductUploadName(extraProductFile.name)}`,
+          )
+        }
+        for (const [index, extraProductFile] of angle06HandProductFiles.entries()) {
+          generateForm.append(
+            'images',
+            await compressMergeReferenceFile(extraProductFile, 'product'),
+            `merge-angle06-hand-product-${index + 2}-${cleanMergeProductUploadName(extraProductFile.name)}`,
+          )
+        }
+        for (const [index, extraProductFile] of extraProductReferenceFiles.entries()) {
+          generateForm.append(
+            'images',
+            await compressMergeReferenceFile(extraProductFile, 'product'),
+            `merge-product-extra-${index + 2}-${extraProductFile.name}`,
+          )
+        }
         if (cleanedAngleControl?.file) {
           generateForm.append('images', cleanedAngleControl.file, `merge-angle-control-${cleanedAngleControl.file.name}`)
         }
@@ -7765,6 +7945,7 @@ function App() {
                         <div className="multi-angle-upload-grid merge-image-upload-grid">
                           {mergeImageSlots.map((slot) => {
                             const slotFiles = mergeImageFiles[slot.id] || []
+                            const slotAllowsMultiple = canMergeSlotUseMultiple(slot.id)
                             return (
                               <section
                                 className={`multi-angle-slot merge-image-slot ${slotFiles.length ? 'has-files' : ''} ${draggingMergeImageSlot === slot.id ? 'drag-over' : ''}`}
@@ -7783,7 +7964,7 @@ function App() {
                                   <input
                                     type="file"
                                     accept="image/*"
-                                    multiple={isMergeAngleUploadSlot(slot.id)}
+                                    multiple={slotAllowsMultiple}
                                     onChange={(event) => {
                                       selectMergeImage(slot.id, event.currentTarget.files)
                                       event.currentTarget.value = ''
@@ -7793,11 +7974,11 @@ function App() {
                                 {slotFiles.length > 0 && (
                                   <button
                                     type="button"
-                                    className={`slot-preview ${isMergeAngleUploadSlot(slot.id) && slotFiles.length > 1 ? 'slot-preview-stack' : ''}`}
+                                    className={`slot-preview ${slotAllowsMultiple && slotFiles.length > 1 ? 'slot-preview-stack' : ''}`}
                                     onClick={() => {
-                                      if (isMergeAngleUploadSlot(slot.id) && slotFiles.length > 1) setMergeReferenceModalSlot(slot.id)
+                                      if (slotAllowsMultiple) setMergeReferenceModalSlot(slot.id as MergeReferenceModalSlotId)
                                     }}
-                                    aria-label={isMergeAngleUploadSlot(slot.id) && slotFiles.length > 1 ? `查看全部${slot.label}` : `${slot.label}预览`}
+                                    aria-label={slotAllowsMultiple ? `管理${slot.label}` : `${slot.label}预览`}
                                   >
                                     {slotFiles.map((file, index) => (
                                       <figure className="slot-preview-item" key={`${file.name}-${index}`}>
@@ -7805,7 +7986,7 @@ function App() {
                                           src={mergeImagePreviewUrls[`${slot.id}-${index}`]}
                                           alt={`${slot.label}预览 ${index + 1}`}
                                         />
-                                        {(!isMergeAngleUploadSlot(slot.id) || slotFiles.length === 1) && (
+                                        {(!slotAllowsMultiple || slotFiles.length === 1) && (
                                           <span
                                             className="slot-preview-remove"
                                             role="button"
@@ -7829,7 +8010,7 @@ function App() {
                                         )}
                                       </figure>
                                     ))}
-                                    {isMergeAngleUploadSlot(slot.id) && slotFiles.length > 1 && <span className="slot-preview-count">{slotFiles.length}</span>}
+                                    {slotAllowsMultiple && slotFiles.length > 1 && <span className="slot-preview-count">{slotFiles.length}</span>}
                                   </button>
                                 )}
                               </section>
@@ -9148,7 +9329,11 @@ function App() {
             <header>
               <div>
                 <strong>{mergeReferenceSlotLabel(mergeReferenceModalSlot)}</strong>
-                <span>{(mergeImageFiles[mergeReferenceModalSlot] || []).length} 张参考图，将共用产品鞋图、背景图和模特参考图分别生成。</span>
+                <span>
+                  {mergeReferenceModalSlot === 'product'
+                    ? `${(mergeImageFiles.product || []).length} 张产品鞋图；角度6第2张起用于手拿展示鞋，其他角度第2张起作为同一鞋款补充参考。`
+                    : `${(mergeImageFiles[mergeReferenceModalSlot] || []).length} 张参考图，将共用产品鞋图、背景图和模特参考图分别生成。`}
+                </span>
               </div>
               <button type="button" aria-label="关闭" onClick={() => setMergeReferenceModalSlot('')}>
                 ×
@@ -9156,15 +9341,41 @@ function App() {
             </header>
             <div className="merge-reference-modal-grid">
               {(mergeImageFiles[mergeReferenceModalSlot] || []).map((file, index) => (
-                <figure key={`${file.name}-${index}`}>
+                <figure
+                  key={`${file.name}-${index}`}
+                  className={`${mergeReferenceModalSlot === 'product' ? 'is-reorderable' : ''} ${draggingMergeReferenceIndex === index ? 'is-dragging' : ''}`}
+                  draggable={mergeReferenceModalSlot === 'product'}
+                  aria-grabbed={mergeReferenceModalSlot === 'product' && draggingMergeReferenceIndex === index}
+                  onDragStart={(event) => {
+                    if (mergeReferenceModalSlot !== 'product') return
+                    event.dataTransfer.effectAllowed = 'move'
+                    event.dataTransfer.setData('text/plain', String(index))
+                    setDraggingMergeReferenceIndex(index)
+                  }}
+                  onDragOver={(event) => {
+                    if (mergeReferenceModalSlot !== 'product' || draggingMergeReferenceIndex === null) return
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'move'
+                    if (draggingMergeReferenceIndex !== index) {
+                      moveMergeImage(mergeReferenceModalSlot, draggingMergeReferenceIndex, index)
+                      setDraggingMergeReferenceIndex(index)
+                    }
+                  }}
+                  onDragEnd={() => setDraggingMergeReferenceIndex(null)}
+                  onDrop={(event) => {
+                    if (mergeReferenceModalSlot !== 'product') return
+                    event.preventDefault()
+                    setDraggingMergeReferenceIndex(null)
+                  }}
+                >
                   <img src={mergeImagePreviewUrls[`${mergeReferenceModalSlot}-${index}`]} alt={`${mergeReferenceSlotLabel(mergeReferenceModalSlot)} ${index + 1}`} />
-                  <button type="button" onClick={() => removeMergeImage(mergeReferenceModalSlot, index)}>
+                  <button type="button" draggable={false} onClick={() => removeMergeImage(mergeReferenceModalSlot, index)}>
                     ×
                   </button>
                   <figcaption>{mergeReferenceSlotLabel(mergeReferenceModalSlot)} {index + 1}</figcaption>
                 </figure>
               ))}
-              {(mergeImageFiles[mergeReferenceModalSlot] || []).length < mergeAngleBatchLimit && (
+              {(mergeImageFiles[mergeReferenceModalSlot] || []).length < mergeSlotFileLimit(mergeReferenceModalSlot) && (
                 <label
                   className={`merge-reference-add ${draggingMergeImageSlot === `${mergeReferenceModalSlot}-modal` ? 'drag-over' : ''}`}
                   onDragEnter={(event) => handleMergeImageDragOver(event, `${mergeReferenceModalSlot}-modal`)}
