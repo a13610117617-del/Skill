@@ -1,10 +1,16 @@
 import { angle01 } from './angles/angle-01'
+import { angle01SingleProductFinalPrompt, angle01SingleProductPrompt } from './angles/angle-01-single-product'
+import { angle01TwoProductFinalPrompt, angle01TwoProductPrompt } from './angles/angle-01-two-product'
 import { angle02 } from './angles/angle-02'
 import { angle03 } from './angles/angle-03'
 import { angle04 } from './angles/angle-04'
+import { angle04SingleProductFinalPrompt, angle04SingleProductPrompt } from './angles/angle-04-single-product'
+import { angle04TwoProductFinalPrompt, angle04TwoProductPrompt } from './angles/angle-04-two-product'
 import { angle05 } from './angles/angle-05'
 import { angle06 } from './angles/angle-06'
 import { angle08 } from './angles/angle-08'
+import { angle08SingleProductFinalPrompt, angle08SingleProductPrompt } from './angles/angle-08-single-product'
+import { angle08TwoProductFinalPrompt, angle08TwoProductPrompt } from './angles/angle-08-two-product'
 import { angle09 } from './angles/angle-09'
 import { angle10 } from './angles/angle-10'
 import { angle11 } from './angles/angle-11'
@@ -43,3 +49,18 @@ export const mergeAngleLibrary: MergeAngleLibraryItem[] = mergeAngleConfigs.map(
   label: `角度 ${index + 1}`,
   url: `/assets/merge-angle-library/angle-${String(angle.imageNumber).padStart(2, '0')}.png`,
 }))
+
+export {
+  angle01SingleProductFinalPrompt,
+  angle01SingleProductPrompt,
+  angle01TwoProductFinalPrompt,
+  angle01TwoProductPrompt,
+  angle04SingleProductFinalPrompt,
+  angle04SingleProductPrompt,
+  angle04TwoProductFinalPrompt,
+  angle04TwoProductPrompt,
+  angle08SingleProductFinalPrompt,
+  angle08SingleProductPrompt,
+  angle08TwoProductFinalPrompt,
+  angle08TwoProductPrompt,
+}

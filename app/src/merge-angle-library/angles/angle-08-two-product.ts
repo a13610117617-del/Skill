@@ -1,0 +1,8 @@
+import { angle08 } from './angle-08'
+
+export const angle08TwoProductPrompt = [
+  angle08.prompt,
+  'Angle 7 two-product inner/outer side lock, only when exactly two product shoe images are uploaded for the UI angle 7 template (code id angle-08): Product image 1 / main product-shoe reference is the authoritative source for the shoe OUTER side appearance. Product image 2 / angle-7-inner-side-product-shoe reference is the authoritative source for the shoe INNER side appearance. Generate the two worn shoes like the selected angle-7 reference: the two shoes stay on both crossed feet, and the sides close to the center gap between the two shoes are the OUTER sides and must use Product image 1; the far left and far right outside edges of the pair are the INNER sides and must use Product image 2. Do not swap inner and outer sides. Do not use Product image 2 as a third shoe, display shoe, background, model, foot, leg, or generic supplementary view. Keep the original single-product angle-7 seated crossed-leg pose, crossed ankles, right-facing body direction, shoe placement, toe direction, close shoe-focused crop, and lower-body-only framing unchanged.',
+].join('\n')
+
+export const angle08TwoProductFinalPrompt = 'Final angle-7 two-product check: Product image 1 controls only the middle-facing OUTER shoe sides near the gap between the two worn shoes; Product image 2 / angle-7-inner-side-product-shoe controls only the far-left and far-right INNER shoe sides. If the center-facing sides use Product image 2, if the outside edges use Product image 1, if Product image 2 becomes an extra shoe, or if both shoes become the same side, the result is wrong.'
